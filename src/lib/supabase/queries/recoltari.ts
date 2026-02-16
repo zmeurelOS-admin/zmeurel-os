@@ -1,7 +1,6 @@
 // src/lib/supabase/queries/recoltari.ts
-import { createClient as createSupabaseClient } from '../client';
+import { createClient } from '../client';
 
-// Interface pentru Recoltare
 export interface Recoltare {
   id: string;
   tenant_id: string;
@@ -13,32 +12,30 @@ export interface Recoltare {
   tara_kg: number;
   observatii: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-// Input pentru creare recoltare
 export interface CreateRecoltareInput {
   tenant_id: string;
   data: string;
-  culegator_id?: string | null;
-  parcela_id?: string | null;
+  culegator_id?: string;
+  parcela_id?: string;
   nr_caserole: number;
   tara_kg?: number;
   observatii?: string;
 }
 
-// Input pentru update recoltare
 export interface UpdateRecoltareInput {
   data?: string;
-  culegator_id?: string | null;
-  parcela_id?: string | null;
+  culegator_id?: string;
+  parcela_id?: string;
   nr_caserole?: number;
   tara_kg?: number;
   observatii?: string;
 }
 
-// Generare ID automat pentru recoltări: R001, R002, etc.
 async function generateNextId(tenantId: string): Promise<string> {
-  const supabase = createSupabaseClient();
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('recoltari')
@@ -65,13 +62,11 @@ async function generateNextId(tenantId: string): Promise<string> {
   }
   
   const nextNumber = numericPart + 1;
-
   return `R${nextNumber.toString().padStart(3, '0')}`;
 }
 
-// GET: Toate recoltările pentru un tenant
 export async function getRecoltari(tenantId: string): Promise<Recoltare[]> {
-  const supabase = createSupabaseClient();
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('recoltari')
@@ -87,39 +82,8 @@ export async function getRecoltari(tenantId: string): Promise<Recoltare[]> {
   return data || [];
 }
 
-// GET: Recoltări pentru o anumită lună
-export async function getRecoltariByMonth(
-  tenantId: string,
-  year: number,
-  month: number
-): Promise<Recoltare[]> {
-  const supabase = createSupabaseClient();
-
-  const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0];
-
-  const { data, error } = await supabase
-    .from('recoltari')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .gte('data', startDate)
-    .lte('data', endDate)
-    .order('data', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching recoltari by month:', error);
-    throw error;
-  }
-
-  return data || [];
-}
-
-// POST: Creare recoltare nouă
-export async function createRecoltare(
-  input: CreateRecoltareInput
-): Promise<Recoltare> {
-  const supabase = createSupabaseClient();
-
+export async function createRecoltare(input: CreateRecoltareInput): Promise<Recoltare> {
+  const supabase = createClient();
   const nextId = await generateNextId(input.tenant_id);
 
   const { data, error } = await supabase
@@ -145,16 +109,15 @@ export async function createRecoltare(
   return data;
 }
 
-// PUT: Update recoltare existentă
-export async function updateRecoltare(
-  id: string,
-  input: UpdateRecoltareInput
-): Promise<Recoltare> {
-  const supabase = createSupabaseClient();
+export async function updateRecoltare(id: string, input: UpdateRecoltareInput): Promise<Recoltare> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('recoltari')
-    .update(input)
+    .update({
+      ...input,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id)
     .select()
     .single();
@@ -167,9 +130,8 @@ export async function updateRecoltare(
   return data;
 }
 
-// DELETE: Ștergere recoltare
 export async function deleteRecoltare(id: string): Promise<void> {
-  const supabase = createSupabaseClient();
+  const supabase = createClient();
 
   const { error } = await supabase.from('recoltari').delete().eq('id', id);
 

@@ -1,43 +1,73 @@
 // src/lib/supabase/queries/clienti.ts
-import { createClient as createSupabaseClient } from '../client';
-
-// ========================================
-// INTERFAȚĂ TYPESCRIPT
-// ========================================
+import { createClient } from '../client';
 
 export interface Client {
   id: string;
   tenant_id: string;
-  id_client: string; // "CL001", "CL002", etc.
+  id_client: string;
   nume_client: string;
   telefon: string | null;
   email: string | null;
   adresa: string | null;
-  pret_negociat_lei_kg: number | null; // NULL = preț standard
+  pret_negociat_lei_kg: number | null;
   observatii: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-// Type pentru create (fără id, created_at, id_client auto-generat)
-export type CreateClientInput = Omit<Client, 'id' | 'created_at' | 'id_client'>;
+export interface CreateClientInput {
+  tenant_id: string;
+  nume_client: string;
+  telefon?: string;
+  email?: string;
+  adresa?: string;
+  pret_negociat_lei_kg?: number;
+  observatii?: string;
+}
 
-// Type pentru update (doar câmpurile editabile)
-export type UpdateClientInput = Partial<Omit<Client, 'id' | 'tenant_id' | 'created_at'>>;
+export interface UpdateClientInput {
+  nume_client?: string;
+  telefon?: string;
+  email?: string;
+  adresa?: string;
+  pret_negociat_lei_kg?: number;
+  observatii?: string;
+}
 
-// ========================================
-// CRUD FUNCTIONS
-// ========================================
+async function generateNextId(tenantId: string): Promise<string> {
+  const supabase = createClient();
 
-/**
- * Fetch all clienți pentru un tenant
- * @param tenantId - ID-ul tenant-ului
- * @returns Array de clienți sortați după id_client
- */
+  const { data, error } = await supabase
+    .from('clienti')
+    .select('id_client')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('Error fetching last client ID:', error);
+    return 'CL001';
+  }
+
+  if (!data || data.length === 0) {
+    return 'CL001';
+  }
+
+  const lastId = data[0].id_client;
+  const numericPart = parseInt(lastId.replace('CL', ''), 10);
+  
+  if (isNaN(numericPart)) {
+    console.error('Invalid ID format:', lastId);
+    return 'CL001';
+  }
+  
+  const nextNumber = numericPart + 1;
+  return `CL${nextNumber.toString().padStart(3, '0')}`;
+}
+
 export async function getClienti(tenantId: string): Promise<Client[]> {
-  console.log('[getClienti] Fetching clienti for tenant:', tenantId);
-  
-  const supabase = createSupabaseClient();
-  
+  const supabase = createClient();
+
   const { data, error } = await supabase
     .from('clienti')
     .select('*')
@@ -45,185 +75,68 @@ export async function getClienti(tenantId: string): Promise<Client[]> {
     .order('id_client', { ascending: true });
 
   if (error) {
-    console.error('[getClienti] ERROR:', error);
-    throw new Error(`Eroare la încărcarea clienților: ${error.message}`);
+    console.error('Error fetching clienti:', error);
+    throw error;
   }
 
-  console.log('[getClienti] SUCCESS - Fetched:', data?.length || 0, 'clienti');
   return data || [];
 }
 
-/**
- * Fetch client by ID
- * @param id - UUID-ul clientului
- * @returns Client sau null
- */
-export async function getClientById(id: string): Promise<Client | null> {
-  console.log('[getClientById] Fetching client ID:', id);
-  
-  const supabase = createSupabaseClient();
-  
-  const { data, error } = await supabase
-    .from('clienti')
-    .select('*')
-    .eq('id', id)
-    .single();
+export async function createNewClient(input: CreateClientInput): Promise<Client> {
+  const supabase = createClient();
+  const nextId = await generateNextId(input.tenant_id);
 
-  if (error) {
-    console.error('[getClientById] ERROR:', error);
-    return null;
-  }
-
-  console.log('[getClientById] SUCCESS - Found:', data?.nume_client);
-  return data;
-}
-
-/**
- * Generează următorul ID_Client automat (CL001, CL002, etc.)
- * @param tenantId - ID-ul tenant-ului
- * @returns Next ID în format "CL001", "CL002", etc.
- */
-async function generateNextClientId(tenantId: string): Promise<string> {
-  console.log('[generateNextClientId] Generating for tenant:', tenantId);
-  
-  const supabase = createSupabaseClient();
-  
-  // Fetch ultimul client din tenant
-  const { data, error } = await supabase
-    .from('clienti')
-    .select('id_client')
-    .eq('tenant_id', tenantId)
-    .order('id_client', { ascending: false })
-    .limit(1);
-
-  if (error) {
-    console.error('[generateNextClientId] ERROR:', error);
-    throw new Error(`Eroare la generarea ID client: ${error.message}`);
-  }
-
-  if (!data || data.length === 0) {
-    // Primul client
-    console.log('[generateNextClientId] First client - Returning CL001');
-    return 'CL001';
-  }
-
-  // Extrage numărul din ultimul ID (ex: "CL005" → 5)
-  const lastId = data[0].id_client;
-  const lastNumber = parseInt(lastId.substring(2)); // Remove "CL" prefix
-  const nextNumber = lastNumber + 1;
-  const nextId = `CL${String(nextNumber).padStart(3, '0')}`; // "CL006"
-
-  console.log('[generateNextClientId] Last ID:', lastId, '→ Next ID:', nextId);
-  return nextId;
-}
-
-/**
- * Create nou client
- * @param client - Date client (fără id, created_at, id_client)
- * @returns Client creat
- */
-export async function createClient(client: CreateClientInput): Promise<Client> {
-  console.log('[createClient] Creating client:', client.nume_client);
-  
-  const supabase = createSupabaseClient();
-  
-  // 1. Generează ID automat
-  const id_client = await generateNextClientId(client.tenant_id);
-  console.log('[createClient] Generated ID:', id_client);
-
-  // 2. Insert în database
   const { data, error } = await supabase
     .from('clienti')
     .insert({
-      ...client,
-      id_client,
+      tenant_id: input.tenant_id,
+      id_client: nextId,
+      nume_client: input.nume_client,
+      telefon: input.telefon || null,
+      email: input.email || null,
+      adresa: input.adresa || null,
+      pret_negociat_lei_kg: input.pret_negociat_lei_kg || null,
+      observatii: input.observatii || null,
     })
     .select()
     .single();
 
   if (error) {
-    console.error('[createClient] ERROR:', error);
-    throw new Error(`Eroare la crearea clientului: ${error.message}`);
+    console.error('Error creating client:', error);
+    throw error;
   }
 
-  console.log('[createClient] SUCCESS - Created:', data.id_client, data.nume_client);
   return data;
 }
 
-/**
- * Update client existent
- * @param id - UUID-ul clientului
- * @param updates - Câmpuri de actualizat
- * @returns Client actualizat
- */
-export async function updateClient(
-  id: string,
-  updates: UpdateClientInput
-): Promise<Client> {
-  console.log('[updateClient] Updating client ID:', id, 'with:', updates);
-  
-  const supabase = createSupabaseClient();
-  
+export async function updateClient(id: string, input: UpdateClientInput): Promise<Client> {
+  const supabase = createClient();
+
   const { data, error } = await supabase
     .from('clienti')
-    .update(updates)
+    .update({
+      ...input,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id)
     .select()
     .single();
 
   if (error) {
-    console.error('[updateClient] ERROR:', error);
-    throw new Error(`Eroare la actualizarea clientului: ${error.message}`);
+    console.error('Error updating client:', error);
+    throw error;
   }
 
-  console.log('[updateClient] SUCCESS - Updated:', data.id_client, data.nume_client);
   return data;
 }
 
-/**
- * Delete client
- * @param id - UUID-ul clientului
- */
 export async function deleteClient(id: string): Promise<void> {
-  console.log('[deleteClient] Deleting client ID:', id);
-  
-  const supabase = createSupabaseClient();
-  
-  const { error } = await supabase
-    .from('clienti')
-    .delete()
-    .eq('id', id);
+  const supabase = createClient();
+
+  const { error } = await supabase.from('clienti').delete().eq('id', id);
 
   if (error) {
-    console.error('[deleteClient] ERROR:', error);
-    throw new Error(`Eroare la ștergerea clientului: ${error.message}`);
+    console.error('Error deleting client:', error);
+    throw error;
   }
-
-  console.log('[deleteClient] SUCCESS - Deleted client ID:', id);
-}
-
-/**
- * Fetch clienți cu preț negociat (pentru rapoarte)
- * @param tenantId - ID-ul tenant-ului
- * @returns Array de clienți cu prețuri negociate
- */
-export async function getClientiCuPretNegociat(tenantId: string): Promise<Client[]> {
-  console.log('[getClientiCuPretNegociat] Fetching for tenant:', tenantId);
-  
-  const supabase = createSupabaseClient();
-  
-  const { data, error } = await supabase
-    .from('clienti')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .not('pret_negociat_lei_kg', 'is', null)
-    .order('nume_client', { ascending: true });
-
-  if (error) {
-    console.error('[getClientiCuPretNegociat] ERROR:', error);
-    throw new Error(`Eroare la încărcarea clienților: ${error.message}`);
-  }
-
-  console.log('[getClientiCuPretNegociat] SUCCESS - Fetched:', data?.length || 0);
-  return data || [];
 }

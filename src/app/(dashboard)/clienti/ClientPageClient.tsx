@@ -13,7 +13,7 @@ import { EditClientDialog } from '@/components/clienti/EditClientDialog';
 import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog';
 import {
   getClienti,
-  createClient,
+  createNewClient,
   updateClient,
   deleteClient,
   type Client,
@@ -55,7 +55,7 @@ export function ClientPageClient({
   // Create client
   const createMutation = useMutation({
     mutationFn: (data: any) =>
-      createClient({
+      createNewClient({
         tenant_id: tenantId,
         nume_client: data.nume_client,
         telefon: data.telefon || null,

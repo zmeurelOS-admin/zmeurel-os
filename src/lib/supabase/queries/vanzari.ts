@@ -1,7 +1,9 @@
 // src/lib/supabase/queries/vanzari.ts
-import { createClient as createSupabaseClient } from '../client';
+import { createClient } from '../client';
 
-// Interface pentru Vânzare
+// Constants
+export const STATUS_PLATA = ['Plătit', 'Restanță', 'Avans'] as const;
+
 export interface Vanzare {
   id: string;
   tenant_id: string;
@@ -13,35 +15,30 @@ export interface Vanzare {
   status_plata: string;
   observatii_ladite: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-// Status plată disponibile
-export const STATUS_PLATA = ['Plătit', 'Restanță', 'Avans'] as const;
-
-// Input pentru creare vânzare
 export interface CreateVanzareInput {
   tenant_id: string;
   data: string;
-  client_id?: string | null;
+  client_id?: string;
   cantitate_kg: number;
   pret_lei_kg: number;
   status_plata?: string;
   observatii_ladite?: string;
 }
 
-// Input pentru update vânzare
 export interface UpdateVanzareInput {
   data?: string;
-  client_id?: string | null;
+  client_id?: string;
   cantitate_kg?: number;
   pret_lei_kg?: number;
   status_plata?: string;
   observatii_ladite?: string;
 }
 
-// Generare ID automat pentru vânzări: V001, V002, etc.
 async function generateNextId(tenantId: string): Promise<string> {
-  const supabase = createSupabaseClient();
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('vanzari')
@@ -68,13 +65,11 @@ async function generateNextId(tenantId: string): Promise<string> {
   }
   
   const nextNumber = numericPart + 1;
-
   return `V${nextNumber.toString().padStart(3, '0')}`;
 }
 
-// GET: Toate vânzările pentru un tenant
 export async function getVanzari(tenantId: string): Promise<Vanzare[]> {
-  const supabase = createSupabaseClient();
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('vanzari')
@@ -90,39 +85,8 @@ export async function getVanzari(tenantId: string): Promise<Vanzare[]> {
   return data || [];
 }
 
-// GET: Vânzări pentru o anumită lună
-export async function getVanzariByMonth(
-  tenantId: string,
-  year: number,
-  month: number
-): Promise<Vanzare[]> {
-  const supabase = createSupabaseClient();
-
-  const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0];
-
-  const { data, error } = await supabase
-    .from('vanzari')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .gte('data', startDate)
-    .lte('data', endDate)
-    .order('data', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching vanzari by month:', error);
-    throw error;
-  }
-
-  return data || [];
-}
-
-// POST: Creare vânzare nouă
-export async function createVanzare(
-  input: CreateVanzareInput
-): Promise<Vanzare> {
-  const supabase = createSupabaseClient();
-
+export async function createVanzare(input: CreateVanzareInput): Promise<Vanzare> {
+  const supabase = createClient();
   const nextId = await generateNextId(input.tenant_id);
 
   const { data, error } = await supabase
@@ -148,16 +112,15 @@ export async function createVanzare(
   return data;
 }
 
-// PUT: Update vânzare existentă
-export async function updateVanzare(
-  id: string,
-  input: UpdateVanzareInput
-): Promise<Vanzare> {
-  const supabase = createSupabaseClient();
+export async function updateVanzare(id: string, input: UpdateVanzareInput): Promise<Vanzare> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('vanzari')
-    .update(input)
+    .update({
+      ...input,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id)
     .select()
     .single();
@@ -170,9 +133,8 @@ export async function updateVanzare(
   return data;
 }
 
-// DELETE: Ștergere vânzare
 export async function deleteVanzare(id: string): Promise<void> {
-  const supabase = createSupabaseClient();
+  const supabase = createClient();
 
   const { error } = await supabase.from('vanzari').delete().eq('id', id);
 

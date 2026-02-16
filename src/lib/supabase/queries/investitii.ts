@@ -1,21 +1,7 @@
 // src/lib/supabase/queries/investitii.ts
-import { createClient as createSupabaseClient } from '../client';
+import { createClient } from '../client';
 
-// Interface pentru Investiție
-export interface Investitie {
-  id: string;
-  tenant_id: string;
-  id_investitie: string;
-  data: string; // Date format: YYYY-MM-DD
-  parcela_id: string | null;
-  categorie: string;
-  furnizor: string | null;
-  descriere: string | null;
-  suma_lei: number;
-  created_at: string;
-}
-
-// Categorii CAPEX disponibile
+// Constants
 export const CATEGORII_INVESTITII = [
   'Butași',
   'Spalieri & Sârmă',
@@ -25,40 +11,53 @@ export const CATEGORII_INVESTITII = [
   'Alte Investiții',
 ] as const;
 
-// Culori pentru badge-uri categorii (inline styles pentru Tailwind v4 alpha)
-export const BADGE_COLORS: Record<string, { bg: string; text: string }> = {
-  'Butași': { bg: '#dcfce7', text: '#166534' }, // green
-  'Spalieri & Sârmă': { bg: '#dbeafe', text: '#1e40af' }, // blue
-  'Sistem Irigație': { bg: '#cffafe', text: '#155e75' }, // cyan
-  'Transport & Logistică': { bg: '#fef3c7', text: '#92400e' }, // yellow
-  'Manoperă Plantare': { bg: '#f3e8ff', text: '#6b21a8' }, // purple
-  'Alte Investiții': { bg: '#f3f4f6', text: '#374151' }, // gray
+export const BADGE_COLORS: Record<string, string> = {
+  'Butași': 'bg-green-100 text-green-800',
+  'Spalieri & Sârmă': 'bg-blue-100 text-blue-800',
+  'Sistem Irigație': 'bg-cyan-100 text-cyan-800',
+  'Transport & Logistică': 'bg-purple-100 text-purple-800',
+  'Manoperă Plantare': 'bg-yellow-100 text-yellow-800',
+  'Alte Investiții': 'bg-gray-100 text-gray-800',
 };
 
-// Input pentru creare investiție
+export interface Investitie {
+  id: string;
+  tenant_id: string;
+  id_investitie: string;
+  data: string;
+  parcela_id: string | null;
+  categorie: string | null;
+  furnizor: string | null;
+  descriere: string | null;
+  suma_lei: number;
+  document_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CreateInvestitieInput {
   tenant_id: string;
   data: string;
-  parcela_id?: string | null;
-  categorie: string;
+  parcela_id?: string;
+  categorie?: string;
   furnizor?: string;
   descriere?: string;
   suma_lei: number;
+  document_url?: string;
 }
 
-// Input pentru update investiție
 export interface UpdateInvestitieInput {
   data?: string;
-  parcela_id?: string | null;
+  parcela_id?: string;
   categorie?: string;
   furnizor?: string;
   descriere?: string;
   suma_lei?: number;
+  document_url?: string;
 }
 
-// Generare ID automat pentru investiții: INV001, INV002, etc.
 async function generateNextId(tenantId: string): Promise<string> {
-  const supabase = createSupabaseClient();
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('investitii')
@@ -69,35 +68,33 @@ async function generateNextId(tenantId: string): Promise<string> {
 
   if (error) {
     console.error('Error fetching last investitie ID:', error);
-    return 'INV001';
+    return 'I001';
   }
 
   if (!data || data.length === 0) {
-    return 'INV001';
+    return 'I001';
   }
 
   const lastId = data[0].id_investitie;
-  const numericPart = parseInt(lastId.replace('INV', ''), 10);
+  const numericPart = parseInt(lastId.replace('I', ''), 10);
   
   if (isNaN(numericPart)) {
     console.error('Invalid ID format:', lastId);
-    return 'INV001';
+    return 'I001';
   }
   
   const nextNumber = numericPart + 1;
-
-  return `INV${nextNumber.toString().padStart(3, '0')}`;
+  return `I${nextNumber.toString().padStart(3, '0')}`;
 }
 
-// GET: Toate investițiile pentru un tenant
 export async function getInvestitii(tenantId: string): Promise<Investitie[]> {
-  const supabase = createSupabaseClient();
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('investitii')
     .select('*')
     .eq('tenant_id', tenantId)
-    .order('data', { ascending: false }); // Cele mai recente primero
+    .order('data', { ascending: false });
 
   if (error) {
     console.error('Error fetching investitii:', error);
@@ -107,85 +104,8 @@ export async function getInvestitii(tenantId: string): Promise<Investitie[]> {
   return data || [];
 }
 
-// GET: Investiții pentru o anumită lună
-export async function getInvestitiiByMonth(
-  tenantId: string,
-  year: number,
-  month: number
-): Promise<Investitie[]> {
-  const supabase = createSupabaseClient();
-
-  // Data începere și sfârșit lună
-  const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // Ultima zi a lunii
-
-  const { data, error } = await supabase
-    .from('investitii')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .gte('data', startDate)
-    .lte('data', endDate)
-    .order('data', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching investitii by month:', error);
-    throw error;
-  }
-
-  return data || [];
-}
-
-// GET: Investiții pentru o anumită perioadă
-export async function getInvestitiiByPeriod(
-  tenantId: string,
-  startDate: string,
-  endDate: string
-): Promise<Investitie[]> {
-  const supabase = createSupabaseClient();
-
-  const { data, error } = await supabase
-    .from('investitii')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .gte('data', startDate)
-    .lte('data', endDate)
-    .order('data', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching investitii by period:', error);
-    throw error;
-  }
-
-  return data || [];
-}
-
-// GET: Total sumă investiții pentru o categorie
-export async function getTotalByCategorie(
-  tenantId: string,
-  categorie: string
-): Promise<number> {
-  const supabase = createSupabaseClient();
-
-  const { data, error } = await supabase
-    .from('investitii')
-    .select('suma_lei')
-    .eq('tenant_id', tenantId)
-    .eq('categorie', categorie);
-
-  if (error) {
-    console.error('Error calculating total by categorie:', error);
-    return 0;
-  }
-
-  return data?.reduce((sum, inv) => sum + inv.suma_lei, 0) || 0;
-}
-
-// POST: Creare investiție nouă
-export async function createInvestitie(
-  input: CreateInvestitieInput
-): Promise<Investitie> {
-  const supabase = createSupabaseClient();
-
+export async function createInvestitie(input: CreateInvestitieInput): Promise<Investitie> {
+  const supabase = createClient();
   const nextId = await generateNextId(input.tenant_id);
 
   const { data, error } = await supabase
@@ -195,10 +115,11 @@ export async function createInvestitie(
       id_investitie: nextId,
       data: input.data,
       parcela_id: input.parcela_id || null,
-      categorie: input.categorie,
+      categorie: input.categorie || null,
       furnizor: input.furnizor || null,
       descriere: input.descriere || null,
       suma_lei: input.suma_lei,
+      document_url: input.document_url || null,
     })
     .select()
     .single();
@@ -211,16 +132,15 @@ export async function createInvestitie(
   return data;
 }
 
-// PUT: Update investiție existentă
-export async function updateInvestitie(
-  id: string,
-  input: UpdateInvestitieInput
-): Promise<Investitie> {
-  const supabase = createSupabaseClient();
+export async function updateInvestitie(id: string, input: UpdateInvestitieInput): Promise<Investitie> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('investitii')
-    .update(input)
+    .update({
+      ...input,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id)
     .select()
     .single();
@@ -233,9 +153,8 @@ export async function updateInvestitie(
   return data;
 }
 
-// DELETE: Ștergere investiție
 export async function deleteInvestitie(id: string): Promise<void> {
-  const supabase = createSupabaseClient();
+  const supabase = createClient();
 
   const { error } = await supabase.from('investitii').delete().eq('id', id);
 
