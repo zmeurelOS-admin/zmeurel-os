@@ -47,10 +47,8 @@ export function AddParcelaDialog({
 }: AddParcelaDialogProps) {
   const [open, setOpen] = useState(false);
 
-  // DEBUG: Afișează soiurile în console când componenta se montează
   useEffect(() => {
     console.log('🔍 [AddParcelaDialog] Soiuri disponibile:', soiuriDisponibile);
-    console.log('🔍 [AddParcelaDialog] Count soiuri:', soiuriDisponibile.length);
   }, [soiuriDisponibile]);
 
   const form = useForm<ParcelaFormData>({
@@ -67,15 +65,17 @@ export function AddParcelaDialog({
 
   const createMutation = useMutation({
     mutationFn: async (data: ParcelaFormData) => {
-      // ID-ul se generează automat în createParcela
+      // ✅ NU mai trimitem tenant_id - createParcela îl preia din sesiune
       return createParcela({
-        tenant_id: tenantId,
+        id_parcela: '',
         nume_parcela: data.nume_parcela,
         suprafata_m2: Number(data.suprafata_m2),
         soi_plantat: data.soi_plantat || null,
         an_plantare: Number(data.an_plantare),
         nr_plante: data.nr_plante ? Number(data.nr_plante) : null,
         status: 'Activ',
+        gps_lat: null,
+        gps_lng: null,
         observatii: data.observatii || null,
       });
     },
@@ -154,33 +154,16 @@ export function AddParcelaDialog({
                 border: '1px solid #d1d5db',
                 borderRadius: '6px',
                 width: '100%',
-                minHeight: '40px'
+                minHeight: '40px',
               }}
             >
-              <option value="" style={{ color: 'gray' }}>Selectează soi...</option>
-              {soiuriDisponibile.length > 0 ? (
-                soiuriDisponibile.map((soi, index) => (
-                  <option
-                    key={`${soi}-${index}`}
-                    value={soi}
-                    style={{
-                      color: 'black',
-                      backgroundColor: 'white',
-                      padding: '8px'
-                    }}
-                  >
-                    {soi}
-                  </option>
-                ))
-              ) : (
-                <option value="" disabled style={{ color: 'red' }}>
-                  Nu există soiuri disponibile
+              <option value="">Selectează soi...</option>
+              {soiuriDisponibile.map((soi, index) => (
+                <option key={`${soi}-${index}`} value={soi}>
+                  {soi}
                 </option>
-              )}
+              ))}
             </select>
-            <p className="text-xs text-gray-500">
-              {soiuriDisponibile.length} soiuri disponibile
-            </p>
           </div>
 
           <div className="space-y-2">
@@ -212,7 +195,7 @@ export function AddParcelaDialog({
             <Label htmlFor="observatii">Observații</Label>
             <Textarea
               id="observatii"
-              placeholder="Notiţe opţionale..."
+              placeholder="Notițe opționale..."
               className="resize-none"
               {...form.register('observatii')}
             />
