@@ -1,105 +1,173 @@
-// src/components/layout/Sidebar.tsx
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard,
   MapPin,
   Users,
   UserCheck,
-  Receipt,
-  TrendingDown,
-  Package,
-  Sprout,
+  PackageOpen,
   ShoppingCart,
-  DollarSign,
+  TrendingUp,
+  Sprout,
+  Receipt,
+  LayoutDashboard,
+  Menu,
+  X,
   LogOut,
+  Leaf,
+  ShoppingBag,
 } from 'lucide-react';
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Parcele', href: '/parcele', icon: MapPin },
-  { name: 'Culegători', href: '/culegatori', icon: Users },
-  { name: 'Clienți', href: '/clienti', icon: UserCheck },
-  { name: 'Recoltări', href: '/recoltari', icon: Package },
-  { name: 'Vânzări Fructe', href: '/vanzari', icon: ShoppingCart },
-  { name: 'Vânzări Butași', href: '/vanzari-butasi', icon: DollarSign },
-  { name: 'Activități Agricole', href: '/activitati-agricole', icon: Sprout },
-  { name: 'Investiții', href: '/investitii', icon: TrendingDown },
-  { name: 'Cheltuieli', href: '/cheltuieli', icon: Receipt },
+const navGroups = [
+  {
+    label: 'OPERAȚIUNI',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/parcele', label: 'Parcele', icon: MapPin },
+      { href: '/recoltari', label: 'Recoltări', icon: PackageOpen },
+      { href: '/activitati-agricole', label: 'Activități Agricole', icon: Sprout },
+    ],
+  },
+  {
+    label: 'RELAȚII',
+    items: [
+      { href: '/culegatori', label: 'Culegători', icon: Users },
+      { href: '/clienti', label: 'Clienți', icon: UserCheck },
+    ],
+  },
+  {
+    label: 'FINANCIAR',
+    items: [
+      { href: '/vanzari', label: 'Vânzări Fructe', icon: ShoppingCart },
+      { href: '/vanzari-butasi', label: 'Vânzări Butași', icon: ShoppingBag },
+      { href: '/investitii', label: 'Investiții', icon: TrendingUp },
+      { href: '/cheltuieli', label: 'Cheltuieli', icon: Receipt },
+    ],
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  return (
-    <div className="flex h-screen w-64 flex-col bg-gradient-to-b from-[#312E3F] to-[#2a2738] text-white shadow-2xl">
-      {/* Logo / Header */}
-      <div className="flex h-16 items-center justify-center border-b border-gray-700/50 px-4">
-        <h1 className="text-2xl font-bold">
-          <span className="text-[#F16B6B]">🍓</span>
-          <span className="ml-2 bg-gradient-to-r from-[#F16B6B] to-[#ff8585] bg-clip-text text-transparent">
-            Zmeurel OS
-          </span>
-        </h1>
+  const isActive = (href: string) => {
+    if (href === '/dashboard') return pathname === '/dashboard';
+    return pathname.startsWith(href);
+  };
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-6 py-7 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-[#F16B6B] flex items-center justify-center shadow-lg shadow-[#F16B6B]/30">
+            <Leaf className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <span
+              className="text-xl font-bold text-white tracking-wide"
+              style={{ fontFamily: "'Georgia', serif", letterSpacing: '0.03em' }}
+            >
+              Zmeurel
+            </span>
+            <span className="text-xs text-slate-400 block -mt-0.5 font-medium tracking-widest uppercase">
+              OS
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Navigation Links */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`
-                group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium 
-                transition-all duration-200 ease-in-out
-                ${
-                  isActive
-                    ? 'bg-gradient-to-r from-[#F16B6B] to-[#ef4444] text-white shadow-lg shadow-[#F16B6B]/20 scale-[1.02]'
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white hover:scale-[1.01]'
-                }
-              `}
-            >
-              <Icon 
-                className={`h-5 w-5 transition-transform duration-200 ${
-                  isActive ? '' : 'group-hover:scale-110'
-                }`} 
-              />
-              <span>{item.name}</span>
-              {isActive && (
-                <div className="ml-auto h-2 w-2 rounded-full bg-white animate-pulse" />
-              )}
-            </Link>
-          );
-        })}
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-5 overflow-y-auto space-y-6">
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            <p className="text-[10px] font-semibold text-slate-500 tracking-widest px-3 mb-2">
+              {group.label}
+            </p>
+            <ul className="space-y-0.5">
+              {group.items.map(({ href, label, icon: Icon }) => {
+                const active = isActive(href);
+                return (
+                  <li key={href}>
+                    <Link
+                      href={href}
+                      onClick={() => setMobileOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group
+                        ${active
+                          ? 'bg-[#F16B6B]/15 text-[#F16B6B]'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200
+                        ${active
+                          ? 'bg-[#F16B6B]/20'
+                          : 'bg-transparent group-hover:bg-white/5'
+                        }`}>
+                        <Icon className={`w-4 h-4 ${active ? 'text-[#F16B6B]' : ''}`} />
+                      </div>
+                      {label}
+                      {active && (
+                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#F16B6B]" />
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
-      {/* User Info / Logout */}
-      <div className="border-t border-gray-700/50 bg-black/10 p-4">
-        <div className="mb-3 rounded-lg bg-white/5 p-3">
-          <p className="font-semibold text-white">Popa Elena</p>
-          <p className="text-xs text-gray-400">popa.andrei.sv@gmail.com</p>
-        </div>
-        <button
-          onClick={() => {
-            // TODO: Implement logout
-            window.location.href = '/login';
-          }}
-          className="
-            flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium 
-            text-gray-300 transition-all duration-200 
-            hover:bg-red-500/10 hover:text-red-400 hover:scale-[1.02]
-          "
-        >
-          <LogOut className="h-4 w-4" />
-          <span>Logout</span>
+      {/* Footer */}
+      <div className="px-3 py-4 border-t border-white/10">
+        <button className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all w-full">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+            <LogOut className="w-4 h-4" />
+          </div>
+          Deconectare
         </button>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-xl bg-[#312E3F] text-white flex items-center justify-center shadow-lg"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <aside
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-72 bg-[#312E3F] transition-transform duration-300 ease-in-out
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <SidebarContent />
+      </aside>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex flex-col w-64 h-screen bg-[#312E3F] fixed top-0 left-0 z-30">
+        <SidebarContent />
+      </aside>
+    </>
   );
 }
