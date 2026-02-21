@@ -48,16 +48,13 @@ const navGroups = [
   },
 ];
 
-export function Sidebar() {
-  const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+type SidebarContentProps = {
+  isActive: (href: string) => boolean;
+  onNavigate: () => void;
+};
 
-  const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard';
-    return pathname.startsWith(href);
-  };
-
-  const SidebarContent = () => (
+function SidebarContent({ isActive, onNavigate }: SidebarContentProps) {
+  return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-6 py-7 border-b border-white/10">
@@ -93,24 +90,24 @@ export function Sidebar() {
                   <li key={href}>
                     <Link
                       href={href}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={onNavigate}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group
-                        ${active
-                          ? 'bg-[#F16B6B]/15 text-[#F16B6B]'
-                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        ${
+                          active
+                            ? 'bg-[#F16B6B]/15 text-[#F16B6B]'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
                         }`}
                     >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200
-                        ${active
-                          ? 'bg-[#F16B6B]/20'
-                          : 'bg-transparent group-hover:bg-white/5'
-                        }`}>
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200
+                        ${
+                          active ? 'bg-[#F16B6B]/20' : 'bg-transparent group-hover:bg-white/5'
+                        }`}
+                      >
                         <Icon className={`w-4 h-4 ${active ? 'text-[#F16B6B]' : ''}`} />
                       </div>
                       {label}
-                      {active && (
-                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#F16B6B]" />
-                      )}
+                      {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#F16B6B]" />}
                     </Link>
                   </li>
                 );
@@ -131,6 +128,16 @@ export function Sidebar() {
       </div>
     </div>
   );
+}
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const isActive = (href: string) => {
+    if (href === '/dashboard') return pathname === '/dashboard';
+    return pathname.startsWith(href);
+  };
 
   return (
     <>
@@ -161,12 +168,19 @@ export function Sidebar() {
         >
           <X className="w-4 h-4" />
         </button>
-        <SidebarContent />
+
+        <SidebarContent
+          isActive={isActive}
+          onNavigate={() => setMobileOpen(false)}
+        />
       </aside>
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-64 h-screen bg-[#312E3F] fixed top-0 left-0 z-30">
-        <SidebarContent />
+        <SidebarContent
+          isActive={isActive}
+          onNavigate={() => setMobileOpen(false)}
+        />
       </aside>
     </>
   );

@@ -12,6 +12,7 @@ export interface Vanzare {
   client_id: string | null;
   cantitate_kg: number;
   pret_lei_kg: number;
+  pret_unitar_lei: number;
   status_plata: string;
   observatii_ladite: string | null;
   created_at: string;
@@ -19,7 +20,6 @@ export interface Vanzare {
 }
 
 export interface CreateVanzareInput {
-  tenant_id: string;
   data: string;
   client_id?: string;
   cantitate_kg: number;
@@ -37,13 +37,12 @@ export interface UpdateVanzareInput {
   observatii_ladite?: string;
 }
 
-async function generateNextId(tenantId: string): Promise<string> {
+async function generateNextId(): Promise<string> {
   const supabase = createClient();
 
   const { data, error } = await supabase
     .from('vanzari')
     .select('id_vanzare')
-    .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -68,13 +67,12 @@ async function generateNextId(tenantId: string): Promise<string> {
   return `V${nextNumber.toString().padStart(3, '0')}`;
 }
 
-export async function getVanzari(tenantId: string): Promise<Vanzare[]> {
+export async function getVanzari(): Promise<Vanzare[]> {
   const supabase = createClient();
 
   const { data, error } = await supabase
     .from('vanzari')
     .select('*')
-    .eq('tenant_id', tenantId)
     .order('data', { ascending: false });
 
   if (error) {
@@ -87,12 +85,11 @@ export async function getVanzari(tenantId: string): Promise<Vanzare[]> {
 
 export async function createVanzare(input: CreateVanzareInput): Promise<Vanzare> {
   const supabase = createClient();
-  const nextId = await generateNextId(input.tenant_id);
+  const nextId = await generateNextId();
 
   const { data, error } = await supabase
     .from('vanzari')
     .insert({
-      tenant_id: input.tenant_id,
       id_vanzare: nextId,
       data: input.data,
       client_id: input.client_id || null,

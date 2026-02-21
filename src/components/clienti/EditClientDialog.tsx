@@ -24,7 +24,7 @@ import type { Client } from '@/lib/supabase/queries/clienti';
 // ========================================
 
 const clientSchema = z.object({
-  nume_client: z.string().min(2, 'Numele trebuie să aibă minim 2 caractere'),
+  nume: z.string().min(2, 'Numele trebuie să aibă minim 2 caractere'),
   telefon: z.string().optional(),
   email: z.string().email('Email invalid').or(z.literal('')).optional(),
   adresa: z.string().optional(),
@@ -56,7 +56,7 @@ export function EditClientDialog({
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
-      nume_client: '',
+      nume: '',
       telefon: '',
       email: '',
       adresa: '',
@@ -69,7 +69,7 @@ export function EditClientDialog({
   useEffect(() => {
     if (client && open) {
       form.reset({
-        nume_client: client.nume_client,
+        nume: client.nume,
         telefon: client.telefon || '',
         email: client.email || '',
         adresa: client.adresa || '',
@@ -105,25 +105,25 @@ export function EditClientDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            Editează Client: {client.id_client}
+            Editează Client: {client.id}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           {/* Nume Client */}
           <div className="space-y-2">
-            <Label htmlFor="nume_client">
+            <Label htmlFor="nume">
               Nume Client <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="nume_client"
-              {...form.register('nume_client')}
+              id="nume"
+              {...form.register('nume')}
               placeholder="Ex: Restaurant La Zmeură"
               style={{ backgroundColor: 'white', color: 'black' }}
             />
-            {form.formState.errors.nume_client && (
+            {form.formState.errors.nume && (
               <p className="text-sm text-red-500">
-                {form.formState.errors.nume_client.message}
+                {form.formState.errors.nume.message}
               </p>
             )}
           </div>

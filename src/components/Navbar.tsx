@@ -4,31 +4,34 @@ import LogoutButton from './LogoutButton';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 export default function Navbar() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [farmName, setFarmName] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
-    
+
     // Verifică sesiunea la mount
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         if (session?.user) {
           setUser(session.user);
-          
+
           // Ia numele fermei
           const { data: tenant } = await supabase
             .from('tenants')
             .select('nume_ferma')
             .eq('owner_user_id', session.user.id)
             .single();
-          
-          if (tenant) {
+
+          if (tenant?.nume_ferma) {
             setFarmName(tenant.nume_ferma);
           }
         }
@@ -42,7 +45,9 @@ export default function Navbar() {
     checkSession();
 
     // Ascultă schimbări autentificare
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
@@ -66,18 +71,14 @@ export default function Navbar() {
               <span className="text-xl font-bold text-[#312E3F]">Zmeurel OS</span>
             </Link>
             {farmName && (
-              <span className="text-sm text-gray-500 hidden sm:block">
-                | {farmName}
-              </span>
+              <span className="text-sm text-gray-500 hidden sm:block">| {farmName}</span>
             )}
           </div>
 
           {/* User Info + Logout */}
           <div className="flex items-center gap-4">
             {user.email && (
-              <span className="text-sm text-gray-600 hidden md:block">
-                👤 {user.email}
-              </span>
+              <span className="text-sm text-gray-600 hidden md:block">👤 {user.email}</span>
             )}
             <LogoutButton />
           </div>

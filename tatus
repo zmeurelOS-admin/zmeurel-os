@@ -1,0 +1,90 @@
+warning: in the working copy of 'package-lock.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'package.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/activitati-agricole/ActivitatiAgricolePageClient.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/cheltuieli/CheltuialaPageClient.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/cheltuieli/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/clienti/ClientPageClient.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/clienti/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/culegatori/CulegatorPageClient.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/culegatori/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/investitii/InvestitiiPageClient.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/investitii/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/parcele/ParcelaPageClient.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/parcele/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/vanzari-butasi/VanzariButasiPageClient.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/vanzari/VanzariPageClient.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(dashboard)/vanzari/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/Navbar.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/cheltuieli/CheltuialaCard.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/investitii/AddInvestitieDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/investitii/EditInvestitieDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/layout/Sidebar.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/parcele/AddParcelaDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/parcele/EditParcelaDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/vanzari-butasi/AddVanzareButasiDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/vanzari-butasi/EditVanzareButasiDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/vanzari/AddVanzareDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/vanzari/EditVanzareDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/queries/activitati-agricole.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/queries/cheltuieli.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/queries/clienti.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/queries/culegatori.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/queries/investitii.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/queries/parcele.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/queries/recoltari.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/queries/vanzari-butasi.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/queries/vanzari.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase/server.ts', LF will be replaced by CRLF the next time Git touches it
+D	middleware.ts
+D	next
+M	package-lock.json
+M	package.json
+M	src/app/(dashboard)/activitati-agricole/ActivitatiAgricolePageClient.tsx
+M	src/app/(dashboard)/activitati-agricole/page.tsx
+M	src/app/(dashboard)/cheltuieli/CheltuialaPageClient.tsx
+M	src/app/(dashboard)/cheltuieli/page.tsx
+M	src/app/(dashboard)/clienti/ClientPageClient.tsx
+M	src/app/(dashboard)/clienti/page.tsx
+M	src/app/(dashboard)/culegatori/CulegatorPageClient.tsx
+M	src/app/(dashboard)/culegatori/page.tsx
+M	src/app/(dashboard)/investitii/InvestitiiPageClient.tsx
+M	src/app/(dashboard)/investitii/page.tsx
+M	src/app/(dashboard)/parcele/ParcelaPageClient.tsx
+M	src/app/(dashboard)/parcele/page.tsx
+M	src/app/(dashboard)/recoltari/RecoltariPageClient.tsx
+M	src/app/(dashboard)/recoltari/page.tsx
+M	src/app/(dashboard)/vanzari-butasi/VanzariButasiPageClient.tsx
+M	src/app/(dashboard)/vanzari-butasi/page.tsx
+M	src/app/(dashboard)/vanzari/VanzariPageClient.tsx
+M	src/components/Navbar.tsx
+M	src/components/activitati-agricole/AddActivitateAgricolaDialog.tsx
+M	src/components/activitati-agricole/EditActivitateAgricolaDialog.tsx
+M	src/components/cheltuieli/CheltuialaCard.tsx
+M	src/components/clienti/ClientCard.tsx
+M	src/components/clienti/EditClientDialog.tsx
+M	src/components/culegatori/CulegatorCard.tsx
+M	src/components/culegatori/EditCulegatorDialog.tsx
+M	src/components/investitii/AddInvestitieDialog.tsx
+M	src/components/investitii/EditInvestitieDialog.tsx
+M	src/components/layout/Sidebar.tsx
+M	src/components/parcele/AddParcelaDialog.tsx
+M	src/components/parcele/EditParcelaDialog.tsx
+M	src/components/parcele/ParcelaCard.tsx
+M	src/components/recoltari/AddRecoltareDialog.tsx
+M	src/components/recoltari/EditRecoltareDialog.tsx
+M	src/components/ui/textarea.tsx
+M	src/components/vanzari-butasi/AddVanzareButasiDialog.tsx
+M	src/components/vanzari-butasi/EditVanzareButasiDialog.tsx
+M	src/components/vanzari/AddVanzareDialog.tsx
+M	src/components/vanzari/EditVanzareDialog.tsx
+M	src/lib/supabase/queries/activitati-agricole.ts
+M	src/lib/supabase/queries/cheltuieli.ts
+M	src/lib/supabase/queries/clienti.ts
+M	src/lib/supabase/queries/culegatori.ts
+M	src/lib/supabase/queries/investitii.ts
+M	src/lib/supabase/queries/parcele.ts
+M	src/lib/supabase/queries/recoltari.ts
+M	src/lib/supabase/queries/vanzari-butasi.ts
+M	src/lib/supabase/queries/vanzari.ts
+M	src/lib/supabase/server.ts
+D	src/middleware.ts

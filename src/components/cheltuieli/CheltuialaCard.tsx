@@ -1,10 +1,9 @@
-// src/components/cheltuieli/CheltuialaCard.tsx
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Trash2, Calendar, Coins, ShoppingCart, FileText, Tag } from 'lucide-react';
+import { Pencil, Trash2, Calendar, Coins, ShoppingCart, FileText } from 'lucide-react';
 import type { Cheltuiala } from '@/lib/supabase/queries/cheltuieli';
 
 interface CheltuialaCardProps {
@@ -14,14 +13,12 @@ interface CheltuialaCardProps {
 }
 
 export function CheltuialaCard({ cheltuiala, onEdit, onDelete }: CheltuialaCardProps) {
-  // Format data
   const dataFormatted = new Date(cheltuiala.data).toLocaleDateString('ro-RO', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
   });
 
-  // Determine badge color pentru categorie
   const getCategorieColor = (categorie: string) => {
     const colorMap: Record<string, string> = {
       'Electricitate': 'bg-yellow-100 text-yellow-800',
@@ -56,13 +53,11 @@ export function CheltuialaCard({ cheltuiala, onEdit, onDelete }: CheltuialaCardP
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {/* Data */}
         <div className="flex items-center gap-2 text-sm">
           <Calendar className="w-4 h-4 text-muted-foreground" />
           <span>{dataFormatted}</span>
         </div>
 
-        {/* Furnizor */}
         {cheltuiala.furnizor && (
           <div className="flex items-center gap-2 text-sm">
             <ShoppingCart className="w-4 h-4 text-muted-foreground" />
@@ -70,7 +65,6 @@ export function CheltuialaCard({ cheltuiala, onEdit, onDelete }: CheltuialaCardP
           </div>
         )}
 
-        {/* Descriere */}
         {cheltuiala.descriere && (
           <div className="flex items-start gap-2 text-sm">
             <FileText className="w-4 h-4 text-muted-foreground mt-0.5" />
@@ -80,7 +74,6 @@ export function CheltuialaCard({ cheltuiala, onEdit, onDelete }: CheltuialaCardP
           </div>
         )}
 
-        {/* Sumă highlight */}
         <div className="flex items-center gap-2 text-sm pt-2 border-t">
           <Coins className="w-4 h-4 text-muted-foreground" />
           <span className="font-semibold text-lg" style={{ color: '#ef4444' }}>
@@ -88,7 +81,6 @@ export function CheltuialaCard({ cheltuiala, onEdit, onDelete }: CheltuialaCardP
           </span>
         </div>
 
-        {/* Action buttons */}
         <div className="flex gap-2 pt-3 border-t">
           <Button
             variant="outline"
@@ -103,7 +95,12 @@ export function CheltuialaCard({ cheltuiala, onEdit, onDelete }: CheltuialaCardP
             variant="outline"
             size="sm"
             style={{ color: '#ef4444', borderColor: '#ef4444' }}
-            onClick={() => onDelete(cheltuiala.id, `${cheltuiala.categorie || "Altele"} - ${cheltuiala.suma_lei} lei`)}
+            onClick={() =>
+              onDelete(
+                cheltuiala.id,
+                `${cheltuiala.categorie || "Altele"} - ${cheltuiala.suma_lei} lei`
+              )
+            }
           >
             <Trash2 className="w-4 h-4" />
           </Button>

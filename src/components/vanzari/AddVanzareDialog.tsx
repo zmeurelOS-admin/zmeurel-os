@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -36,18 +36,16 @@ const vanzareSchema = z.object({
 
 type VanzareFormData = z.infer<typeof vanzareSchema>;
 
-interface AddVanzareDialogProps {
-  tenantId: string;
-}
+interface AddVanzareDialogProps {}
 
-export function AddVanzareDialog({ tenantId }: AddVanzareDialogProps) {
+export function AddVanzareDialog({}: AddVanzareDialogProps) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch clienti pentru dropdown
   const { data: clienti = [] } = useQuery({
-    queryKey: ['clienti', tenantId],
-    queryFn: () => getClienti(tenantId),
+    queryKey: ['clienti'],
+    queryFn: () => getClienti(),
   });
 
   // Form setup
@@ -55,7 +53,7 @@ export function AddVanzareDialog({ tenantId }: AddVanzareDialogProps) {
     register,
     handleSubmit,
     reset,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<VanzareFormData>({
@@ -70,8 +68,8 @@ export function AddVanzareDialog({ tenantId }: AddVanzareDialogProps) {
     },
   });
 
-  // Watch client selection pentru preț negociat
-  const selectedClientId = watch('client_id');
+  // Watch client selection pentru preț negociat (useWatch -> evită warning React Compiler)
+  const selectedClientId = useWatch({ control, name: 'client_id' }) ?? '';
 
   // Auto-populate preț când se selectează client cu preț negociat
   const handleClientChange = (clientId: string) => {
@@ -103,7 +101,6 @@ export function AddVanzareDialog({ tenantId }: AddVanzareDialogProps) {
   // Submit handler
   const onSubmit = (data: VanzareFormData) => {
     createMutation.mutate({
-      tenant_id: tenantId,
       data: data.data,
       client_id: data.client_id || undefined,
       cantitate_kg: Number(data.cantitate_kg),
@@ -160,7 +157,7 @@ export function AddVanzareDialog({ tenantId }: AddVanzareDialogProps) {
               <option value="">Fără client specificat</option>
               {clienti.map((client) => (
                 <option key={client.id} value={client.id}>
-                  {client.id_client} - {client.nume_client}
+                  {client.id} - {client.nume}
                   {client.pret_negociat_lei_kg && ` (${client.pret_negociat_lei_kg} lei/kg)`}
                 </option>
               ))}

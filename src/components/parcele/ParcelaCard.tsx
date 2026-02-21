@@ -7,7 +7,6 @@ import { Pencil, Trash2 } from 'lucide-react';
 
 interface Parcela {
   id: string;
-  tenant_id: string;
   id_parcela: string;
   nume_parcela: string;
   suprafata_m2: number;

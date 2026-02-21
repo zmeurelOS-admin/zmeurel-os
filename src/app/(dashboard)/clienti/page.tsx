@@ -49,12 +49,12 @@ export default async function ClientPage() {
   // Fetch clienți
   let clienti: Client[] = [];
   try {
-    clienti = await getClienti(tenantId);
+    clienti = await getClienti();
     console.log('[ClientPage] Fetched clienti:', clienti.length);
   } catch (error) {
     console.error('[ClientPage] Error fetching clienti:', error);
   }
 
   // Pass data to Client Component
-  return <ClientPageClient initialClienti={clienti} tenantId={tenantId} />;
+  return <ClientPageClient initialClienti={clienti} />;
 }

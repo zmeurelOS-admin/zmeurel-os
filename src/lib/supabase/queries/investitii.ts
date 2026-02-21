@@ -1,139 +1,179 @@
 // src/lib/supabase/queries/investitii.ts
-import { createClient } from '../client';
 
-// Constants
+import { createClient } from '../client'
+
+// ===============================
+// CONSTANTS
+// ===============================
+
 export const CATEGORII_INVESTITII = [
   'Butași',
-  'Spalieri & Sârmă',
   'Sistem Irigație',
-  'Transport & Logistică',
-  'Manoperă Plantare',
-  'Alte Investiții',
-] as const;
+  'Solar / Tunel',
+  'Utilaje',
+  'Depozitare',
+  'Ambalaje',
+  'Altele',
+] as const
 
+// 🔵 BADGE COLORS (pentru UI)
 export const BADGE_COLORS: Record<string, string> = {
-  'Butași': 'bg-green-100 text-green-800',
-  'Spalieri & Sârmă': 'bg-blue-100 text-blue-800',
-  'Sistem Irigație': 'bg-cyan-100 text-cyan-800',
-  'Transport & Logistică': 'bg-purple-100 text-purple-800',
-  'Manoperă Plantare': 'bg-yellow-100 text-yellow-800',
-  'Alte Investiții': 'bg-gray-100 text-gray-800',
-};
+  'Butași': 'bg-green-100 text-green-700',
+  'Sistem Irigație': 'bg-blue-100 text-blue-700',
+  'Solar / Tunel': 'bg-purple-100 text-purple-700',
+  Utilaje: 'bg-yellow-100 text-yellow-700',
+  Depozitare: 'bg-indigo-100 text-indigo-700',
+  Ambalaje: 'bg-pink-100 text-pink-700',
+  Altele: 'bg-gray-100 text-gray-700',
+}
+
+// ===============================
+// TYPES
+// ===============================
 
 export interface Investitie {
-  id: string;
-  tenant_id: string;
-  id_investitie: string;
-  data: string;
-  parcela_id: string | null;
-  categorie: string | null;
-  furnizor: string | null;
-  descriere: string | null;
-  suma_lei: number;
-  document_url: string | null;
-  created_at: string;
-  updated_at: string;
+  id: string
+  id_investitie: string
+  data: string
+  parcela_id: string | null
+  categorie: string | null
+  furnizor: string | null
+  descriere: string | null
+  suma_lei: number
+  created_at: string
+  updated_at: string
 }
 
 export interface CreateInvestitieInput {
-  tenant_id: string;
-  data: string;
-  parcela_id?: string;
-  categorie?: string;
-  furnizor?: string;
-  descriere?: string;
-  suma_lei: number;
-  document_url?: string;
+  data: string
+  parcela_id?: string
+  categorie: string
+  furnizor?: string
+  descriere?: string
+  suma_lei: number
 }
 
 export interface UpdateInvestitieInput {
-  data?: string;
-  parcela_id?: string;
-  categorie?: string;
-  furnizor?: string;
-  descriere?: string;
-  suma_lei?: number;
-  document_url?: string;
+  data?: string
+  parcela_id?: string
+  categorie?: string
+  furnizor?: string
+  descriere?: string
+  suma_lei?: number
 }
 
-async function generateNextId(tenantId: string): Promise<string> {
-  const supabase = createClient();
+// ===============================
+// INTERNAL ID GENERATOR
+// ===============================
+
+async function generateNextId(): Promise<string> {
+  const supabase = createClient()
 
   const { data, error } = await supabase
     .from('investitii')
     .select('id_investitie')
-    .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
-    .limit(1);
+    .limit(1)
 
-  if (error) {
-    console.error('Error fetching last investitie ID:', error);
-    return 'I001';
-  }
+  if (error) throw error
 
-  if (!data || data.length === 0) {
-    return 'I001';
-  }
+  if (!data || data.length === 0) return 'INV001'
 
-  const lastId = data[0].id_investitie;
-  const numericPart = parseInt(lastId.replace('I', ''), 10);
-  
-  if (isNaN(numericPart)) {
-    console.error('Invalid ID format:', lastId);
-    return 'I001';
-  }
-  
-  const nextNumber = numericPart + 1;
-  return `I${nextNumber.toString().padStart(3, '0')}`;
+  const lastId = data[0].id_investitie
+  const numericPart = parseInt(lastId.replace('INV', ''), 10)
+
+  if (isNaN(numericPart)) throw new Error('Invalid id_investitie format')
+
+  const nextNumber = numericPart + 1
+  return `INV${nextNumber.toString().padStart(3, '0')}`
 }
 
-export async function getInvestitii(tenantId: string): Promise<Investitie[]> {
-  const supabase = createClient();
+// ===============================
+// QUERIES (RLS-FIRST)
+// ===============================
+
+export async function getInvestitii(): Promise<Investitie[]> {
+  const supabase = createClient()
 
   const { data, error } = await supabase
     .from('investitii')
     .select('*')
-    .eq('tenant_id', tenantId)
-    .order('data', { ascending: false });
+    .order('data', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching investitii:', error);
-    throw error;
-  }
+  if (error) throw error
 
-  return data || [];
+  return data ?? []
 }
 
-export async function createInvestitie(input: CreateInvestitieInput): Promise<Investitie> {
-  const supabase = createClient();
-  const nextId = await generateNextId(input.tenant_id);
+/**
+ * CREATE INVESTITIE (RLS-FIRST)
+ * 
+ * 🔐 RLS REQUIREMENTS:
+ * - tenant_id MUST be set automatically via BEFORE INSERT trigger OR RLS WITH CHECK policy
+ * - INSERT policy must exist with WITH CHECK validating tenant_id matches current user's tenant
+ * 
+ * 📋 DB SCHEMA EXPECTATIONS:
+ * - tenant_id: NOT NULL (required)
+ * - tenant_id: No DEFAULT value (set via trigger)
+ * 
+ * 🔧 REQUIRED TRIGGER (if not using RLS WITH CHECK to set):
+ * CREATE FUNCTION set_tenant_id_investitii()
+ * RETURNS trigger AS $$
+ * BEGIN
+ *   NEW.tenant_id := (
+ *     SELECT id FROM tenants
+ *     WHERE owner_user_id = auth.uid()
+ *   );
+ *   RETURN NEW;
+ * END;
+ * $$ LANGUAGE plpgsql;
+ * 
+ * CREATE TRIGGER set_tenant_before_insert_investitii
+ * BEFORE INSERT ON investitii
+ * FOR EACH ROW EXECUTE FUNCTION set_tenant_id_investitii();
+ * 
+ * 🔒 REQUIRED RLS POLICY:
+ * CREATE POLICY tenant_isolation_insert_investitii
+ * ON investitii
+ * FOR INSERT
+ * WITH CHECK (
+ *   tenant_id = (
+ *     SELECT id FROM tenants
+ *     WHERE owner_user_id = auth.uid()
+ *   )
+ * );
+ */
+export async function createInvestitie(
+  input: CreateInvestitieInput
+): Promise<Investitie> {
+  const supabase = createClient()
+  const nextId = await generateNextId()
 
   const { data, error } = await supabase
     .from('investitii')
     .insert({
-      tenant_id: input.tenant_id,
       id_investitie: nextId,
       data: input.data,
-      parcela_id: input.parcela_id || null,
-      categorie: input.categorie || null,
-      furnizor: input.furnizor || null,
-      descriere: input.descriere || null,
+      parcela_id: input.parcela_id ?? null,
+      categorie: input.categorie,
+      furnizor: input.furnizor ?? null,
+      descriere: input.descriere ?? null,
       suma_lei: input.suma_lei,
-      document_url: input.document_url || null,
+      // tenant_id is NOT included - must be set by trigger or RLS policy
     })
     .select()
-    .single();
+    .single()
 
-  if (error) {
-    console.error('Error creating investitie:', error);
-    throw error;
-  }
+  if (error) throw error
 
-  return data;
+  return data
 }
 
-export async function updateInvestitie(id: string, input: UpdateInvestitieInput): Promise<Investitie> {
-  const supabase = createClient();
+export async function updateInvestitie(
+  id: string,
+  input: UpdateInvestitieInput
+): Promise<Investitie> {
+  const supabase = createClient()
 
   const { data, error } = await supabase
     .from('investitii')
@@ -143,23 +183,20 @@ export async function updateInvestitie(id: string, input: UpdateInvestitieInput)
     })
     .eq('id', id)
     .select()
-    .single();
+    .single()
 
-  if (error) {
-    console.error('Error updating investitie:', error);
-    throw error;
-  }
+  if (error) throw error
 
-  return data;
+  return data
 }
 
 export async function deleteInvestitie(id: string): Promise<void> {
-  const supabase = createClient();
+  const supabase = createClient()
 
-  const { error } = await supabase.from('investitii').delete().eq('id', id);
+  const { error } = await supabase
+    .from('investitii')
+    .delete()
+    .eq('id', id)
 
-  if (error) {
-    console.error('Error deleting investitie:', error);
-    throw error;
-  }
+  if (error) throw error
 }

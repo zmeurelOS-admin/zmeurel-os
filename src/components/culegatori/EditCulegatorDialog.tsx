@@ -69,10 +69,10 @@ export function EditCulegatorDialog({
     if (culegator && open) {
       form.reset({
         nume_prenume: culegator.nume_prenume,
-        telefon: culegator.telefon || '',
-        tip_angajare: culegator.tip_angajare,
-        tarif_lei_kg: String(culegator.tarif_lei_kg),
-        data_angajare: culegator.data_angajare || '',
+        telefon: culegator.telefon ?? '',
+        tip_angajare: culegator.tip_angajare ?? '',
+        tarif_lei_kg: culegator.tarif_lei_kg.toString(),
+        data_angajare: culegator.data_angajare ?? '',
         status_activ: culegator.status_activ,
       });
     }

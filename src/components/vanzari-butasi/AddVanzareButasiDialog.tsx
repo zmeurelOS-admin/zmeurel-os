@@ -25,7 +25,10 @@ import { createVanzareButasi } from '@/lib/supabase/queries/vanzari-butasi';
 import { getClienti } from '@/lib/supabase/queries/clienti';
 import { getParcele } from '@/lib/supabase/queries/parcele';
 
-// Schema validare cu Zod
+// ===============================
+// VALIDATION
+// ===============================
+
 const vanzareButasiSchema = z.object({
   data: z.string().min(1, 'Data este obligatorie'),
   client_id: z.string().optional(),
@@ -38,27 +41,25 @@ const vanzareButasiSchema = z.object({
 
 type VanzareButasiFormData = z.infer<typeof vanzareButasiSchema>;
 
-interface AddVanzareButasiDialogProps {
-  tenantId: string;
-}
+// ===============================
+// COMPONENT (RLS-FIRST)
+// ===============================
 
-export function AddVanzareButasiDialog({ tenantId }: AddVanzareButasiDialogProps) {
+export function AddVanzareButasiDialog() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Fetch clienti pentru dropdown
+  // RLS-first queries
   const { data: clienti = [] } = useQuery({
-    queryKey: ['clienti', tenantId],
-    queryFn: () => getClienti(tenantId),
+    queryKey: ['clienti'],
+    queryFn: getClienti,
   });
 
-  // Fetch parcele pentru dropdown
   const { data: parcele = [] } = useQuery({
-    queryKey: ['parcele', tenantId],
-    queryFn: () => getParcele(tenantId),
+    queryKey: ['parcele'],
+    queryFn: getParcele,
   });
 
-  // Form setup
   const {
     register,
     handleSubmit,
@@ -77,7 +78,6 @@ export function AddVanzareButasiDialog({ tenantId }: AddVanzareButasiDialogProps
     },
   });
 
-  // Mutation pentru creare
   const createMutation = useMutation({
     mutationFn: createVanzareButasi,
     onSuccess: () => {
@@ -92,10 +92,8 @@ export function AddVanzareButasiDialog({ tenantId }: AddVanzareButasiDialogProps
     },
   });
 
-  // Submit handler
   const onSubmit = (data: VanzareButasiFormData) => {
     createMutation.mutate({
-      tenant_id: tenantId,
       data: data.data,
       client_id: data.client_id || undefined,
       parcela_sursa_id: data.parcela_sursa_id || undefined,
@@ -115,100 +113,39 @@ export function AddVanzareButasiDialog({ tenantId }: AddVanzareButasiDialogProps
         </Button>
       </DialogTrigger>
 
-      <DialogContent
-        className="max-w-md max-h-[75vh] overflow-y-auto"
-        style={{ backgroundColor: 'white' }}
-      >
+      <DialogContent className="max-w-md max-h-[75vh] overflow-y-auto bg-white">
         <DialogHeader>
           <DialogTitle>Adaugă Vânzare Butași Nouă</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          {/* Data */}
-          <div className="space-y-1">
-            <Label htmlFor="data" className="text-sm">
-              Data vânzării <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="data"
-              type="date"
-              {...register('data')}
-              className={errors.data ? 'border-red-500' : ''}
-            />
-            {errors.data && (
-              <p className="text-xs text-red-500">{errors.data.message}</p>
-            )}
+
+          <div>
+            <Label>Data</Label>
+            <Input type="date" {...register('data')} />
           </div>
 
-          {/* Soi Butași */}
-          <div className="space-y-1">
-            <Label htmlFor="soi_butasi" className="text-sm">
-              Soi butași <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="soi_butasi"
-              type="text"
-              placeholder="Zmeură Polka"
-              {...register('soi_butasi')}
-              className={errors.soi_butasi ? 'border-red-500' : ''}
-            />
-            {errors.soi_butasi && (
-              <p className="text-xs text-red-500">{errors.soi_butasi.message}</p>
-            )}
+          <div>
+            <Label>Soi butași</Label>
+            <Input {...register('soi_butasi')} />
           </div>
 
-          {/* Cantitate și Preț */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="cantitate_butasi" className="text-sm">
-                Cantitate <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="cantitate_butasi"
-                type="number"
-                min="1"
-                placeholder="100"
-                {...register('cantitate_butasi')}
-                className={errors.cantitate_butasi ? 'border-red-500' : ''}
-              />
-              {errors.cantitate_butasi && (
-                <p className="text-xs text-red-500">
-                  {errors.cantitate_butasi.message}
-                </p>
-              )}
+            <div>
+              <Label>Cantitate</Label>
+              <Input type="number" {...register('cantitate_butasi')} />
             </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="pret_unitar_lei" className="text-sm">
-                Preț/buc (lei) <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="pret_unitar_lei"
-                type="number"
-                step="0.01"
-                placeholder="5.00"
-                {...register('pret_unitar_lei')}
-                className={errors.pret_unitar_lei ? 'border-red-500' : ''}
-              />
-              {errors.pret_unitar_lei && (
-                <p className="text-xs text-red-500">
-                  {errors.pret_unitar_lei.message}
-                </p>
-              )}
+            <div>
+              <Label>Preț/buc (lei)</Label>
+              <Input type="number" step="0.01" {...register('pret_unitar_lei')} />
             </div>
           </div>
 
-          {/* Client (optional) */}
-          <div className="space-y-1">
-            <Label htmlFor="client_id" className="text-sm">Client</Label>
-            <select
-              id="client_id"
-              {...register('client_id')}
-              className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              style={{ backgroundColor: 'white' }}
-            >
-              <option value="">Fără client specificat</option>
-              {clienti.map((client) => (
+          <div>
+            <Label>Client</Label>
+            <select {...register('client_id')} className="flex h-10 w-full rounded-md border px-3 py-2 text-sm bg-white">
+              <option value="">Fără client</option>
+              {clienti.map((client: any) => (
                 <option key={client.id} value={client.id}>
                   {client.id_client} - {client.nume_client}
                 </option>
@@ -216,17 +153,11 @@ export function AddVanzareButasiDialog({ tenantId }: AddVanzareButasiDialogProps
             </select>
           </div>
 
-          {/* Parcelă Sursă (optional) */}
-          <div className="space-y-1">
-            <Label htmlFor="parcela_sursa_id" className="text-sm">Parcelă sursă</Label>
-            <select
-              id="parcela_sursa_id"
-              {...register('parcela_sursa_id')}
-              className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              style={{ backgroundColor: 'white' }}
-            >
-              <option value="">Fără parcelă sursă</option>
-              {parcele.map((parcela) => (
+          <div>
+            <Label>Parcelă sursă</Label>
+            <select {...register('parcela_sursa_id')} className="flex h-10 w-full rounded-md border px-3 py-2 text-sm bg-white">
+              <option value="">Fără parcelă</option>
+              {parcele.map((parcela: any) => (
                 <option key={parcela.id} value={parcela.id}>
                   {parcela.id_parcela} - {parcela.nume_parcela}
                 </option>
@@ -234,34 +165,16 @@ export function AddVanzareButasiDialog({ tenantId }: AddVanzareButasiDialogProps
             </select>
           </div>
 
-          {/* Observații */}
-          <div className="space-y-1">
-            <Label htmlFor="observatii" className="text-sm">Observații</Label>
-            <Textarea
-              id="observatii"
-              rows={2}
-              placeholder="Butași înrădăcinați, ambalați în ghivece"
-              {...register('observatii')}
-            />
+          <div>
+            <Label>Observații</Label>
+            <Textarea rows={2} {...register('observatii')} />
           </div>
 
-          {/* Butoane */}
-          <div className="flex justify-end gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                reset();
-                setOpen(false);
-              }}
-            >
+          <div className="flex justify-end gap-3 pt-3">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Anulează
             </Button>
-            <Button
-              type="submit"
-              disabled={createMutation.isPending}
-              className="bg-[#F16B6B] hover:bg-[#E05A5A]"
-            >
+            <Button type="submit" disabled={createMutation.isPending}>
               {createMutation.isPending ? 'Se salvează...' : 'Salvează'}
             </Button>
           </div>

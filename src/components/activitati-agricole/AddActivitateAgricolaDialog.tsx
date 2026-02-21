@@ -1,4 +1,3 @@
-// src/components/activitati-agricole/AddActivitateAgricolaDialog.tsx
 'use client';
 
 import { useState } from 'react';
@@ -27,7 +26,10 @@ import {
 } from '@/lib/supabase/queries/activitati-agricole';
 import { getParcele } from '@/lib/supabase/queries/parcele';
 
-// Schema validare cu Zod
+// ----------------------------
+// Schema validare
+// ----------------------------
+
 const activitateSchema = z.object({
   data_aplicare: z.string().min(1, 'Data este obligatorie'),
   parcela_id: z.string().optional(),
@@ -41,21 +43,20 @@ const activitateSchema = z.object({
 
 type ActivitateFormData = z.infer<typeof activitateSchema>;
 
-interface AddActivitateAgricolaDialogProps {
-  tenantId: string;
-}
+// ----------------------------
+// Componentă
+// ----------------------------
 
-export function AddActivitateAgricolaDialog({ tenantId }: AddActivitateAgricolaDialogProps) {
+export function AddActivitateAgricolaDialog() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Fetch parcele pentru dropdown
+  // 🔐 RLS face izolarea. Nu mai trimitem tenantId.
   const { data: parcele = [] } = useQuery({
-    queryKey: ['parcele', tenantId],
-    queryFn: () => getParcele(tenantId),
+    queryKey: ['parcele'],
+    queryFn: getParcele,
   });
 
-  // Form setup
   const {
     register,
     handleSubmit,
@@ -75,7 +76,6 @@ export function AddActivitateAgricolaDialog({ tenantId }: AddActivitateAgricolaD
     },
   });
 
-  // Mutation pentru creare
   const createMutation = useMutation({
     mutationFn: createActivitateAgricola,
     onSuccess: () => {
@@ -90,16 +90,16 @@ export function AddActivitateAgricolaDialog({ tenantId }: AddActivitateAgricolaD
     },
   });
 
-  // Submit handler
   const onSubmit = (data: ActivitateFormData) => {
     createMutation.mutate({
-      tenant_id: tenantId,
       data_aplicare: data.data_aplicare,
       parcela_id: data.parcela_id || undefined,
       tip_activitate: data.tip_activitate,
       produs_utilizat: data.produs_utilizat || undefined,
       doza: data.doza || undefined,
-      timp_pauza_zile: data.timp_pauza_zile ? Number(data.timp_pauza_zile) : 0,
+      timp_pauza_zile: data.timp_pauza_zile
+        ? Number(data.timp_pauza_zile)
+        : 0,
       operator: data.operator || undefined,
       observatii: data.observatii || undefined,
     });
@@ -120,6 +120,7 @@ export function AddActivitateAgricolaDialog({ tenantId }: AddActivitateAgricolaD
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pb-4">
+
           {/* Data Aplicare */}
           <div>
             <Label htmlFor="data_aplicare">
@@ -132,7 +133,9 @@ export function AddActivitateAgricolaDialog({ tenantId }: AddActivitateAgricolaD
               className={errors.data_aplicare ? 'border-red-500' : ''}
             />
             {errors.data_aplicare && (
-              <p className="text-sm text-red-500 mt-1">{errors.data_aplicare.message}</p>
+              <p className="text-sm text-red-500 mt-1">
+                {errors.data_aplicare.message}
+              </p>
             )}
           </div>
 
@@ -156,11 +159,13 @@ export function AddActivitateAgricolaDialog({ tenantId }: AddActivitateAgricolaD
               ))}
             </select>
             {errors.tip_activitate && (
-              <p className="text-sm text-red-500 mt-1">{errors.tip_activitate.message}</p>
+              <p className="text-sm text-red-500 mt-1">
+                {errors.tip_activitate.message}
+              </p>
             )}
           </div>
 
-          {/* Parcelă (optional) */}
+          {/* Parcelă */}
           <div>
             <Label htmlFor="parcela_id">Parcelă (opțional)</Label>
             <select
@@ -177,68 +182,60 @@ export function AddActivitateAgricolaDialog({ tenantId }: AddActivitateAgricolaD
             </select>
           </div>
 
-          {/* Produs Utilizat */}
+          {/* Produs */}
           <div>
-            <Label htmlFor="produs_utilizat">Produs utilizat (opțional)</Label>
+            <Label htmlFor="produs_utilizat">Produs utilizat</Label>
             <Input
               id="produs_utilizat"
               type="text"
-              placeholder="ex: Actellic 50 EC"
               {...register('produs_utilizat')}
             />
           </div>
 
           {/* Doză */}
           <div>
-            <Label htmlFor="doza">Doză (opțional)</Label>
+            <Label htmlFor="doza">Doză</Label>
             <Input
               id="doza"
               type="text"
-              placeholder="ex: 200 ml/100L apă"
               {...register('doza')}
             />
           </div>
 
-          {/* Timp Pauză (CRITICAL) */}
+          {/* Timp pauză */}
           <div>
             <Label htmlFor="timp_pauza_zile">
-              Timp pauză (zile) - pentru pesticide
+              Timp pauză (zile)
             </Label>
             <Input
               id="timp_pauza_zile"
               type="number"
               min="0"
-              placeholder="0"
               {...register('timp_pauza_zile')}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              ⚠️ Important pentru legislație: timpul minim până când se poate recolta
-            </p>
           </div>
 
           {/* Operator */}
           <div>
-            <Label htmlFor="operator">Operator (opțional)</Label>
+            <Label htmlFor="operator">Operator</Label>
             <Input
               id="operator"
               type="text"
-              placeholder="ex: Ion Popescu"
               {...register('operator')}
             />
           </div>
 
           {/* Observații */}
           <div>
-            <Label htmlFor="observatii">Observații (opțional)</Label>
+            <Label htmlFor="observatii">Observații</Label>
             <Textarea
               id="observatii"
               rows={2}
-              placeholder="ex: Tratament preventiv, vreme însorită"
               {...register('observatii')}
             />
           </div>
 
-          {/* Butoane */}
+          {/* Buttons */}
           <div className="flex justify-end gap-3 pt-4">
             <Button
               type="button"
@@ -250,6 +247,7 @@ export function AddActivitateAgricolaDialog({ tenantId }: AddActivitateAgricolaD
             >
               Anulează
             </Button>
+
             <Button
               type="submit"
               disabled={createMutation.isPending}
