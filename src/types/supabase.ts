@@ -16,7 +16,8 @@ export interface Database {
         Row: {
           id: string
           tenant_id: string
-          nume: string
+          id_client: string
+          nume_client: string
           telefon: string | null
           email: string | null
           adresa: string | null
@@ -28,7 +29,8 @@ export interface Database {
         Insert: {
           id?: string
           tenant_id?: string
-          nume: string
+          id_client?: string
+          nume_client: string
           telefon?: string | null
           email?: string | null
           adresa?: string | null
@@ -40,7 +42,8 @@ export interface Database {
         Update: {
           id?: string
           tenant_id?: string
-          nume?: string
+          id_client?: string
+          nume_client?: string
           telefon?: string | null
           email?: string | null
           adresa?: string | null

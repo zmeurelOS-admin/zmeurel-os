@@ -1,6 +1,5 @@
 // src/app/(dashboard)/clienti/page.tsx
 import { createClient } from '@/lib/supabase/server';
-import { getClienti, type Client } from '@/lib/supabase/queries/clienti';
 import { ClientPageClient } from './ClientPageClient';
 
 export const metadata = {
@@ -11,50 +10,11 @@ export const metadata = {
 export default async function ClientPage() {
   const supabase = await createClient();
 
-  // Get authenticated user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // RLS handles tenant isolation automatically - no manual auth check needed (middleware handles it)
+  const { data: clienti } = await supabase
+    .from('clienti')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-  if (!user) {
-    return (
-      <div className="container mx-auto p-6">
-        <p className="text-red-500">
-          Trebuie să fii autentificat pentru a accesa această pagină.
-        </p>
-      </div>
-    );
-  }
-
-  // Get user's tenant_id
-  const { data: tenantData } = await supabase
-    .from('tenants')
-    .select('id')
-    .eq('owner_user_id', user.id)
-    .single();
-
-  if (!tenantData) {
-    return (
-      <div className="container mx-auto p-6">
-        <p className="text-red-500">
-          Nu ai un cont de fermă configurat. Contactează suportul.
-        </p>
-      </div>
-    );
-  }
-
-  const tenantId = tenantData.id;
-  console.log('[ClientPage] Tenant ID:', tenantId);
-
-  // Fetch clienți
-  let clienti: Client[] = [];
-  try {
-    clienti = await getClienti();
-    console.log('[ClientPage] Fetched clienti:', clienti.length);
-  } catch (error) {
-    console.error('[ClientPage] Error fetching clienti:', error);
-  }
-
-  // Pass data to Client Component
-  return <ClientPageClient initialClienti={clienti} />;
+  return <ClientPageClient initialClienti={clienti || []} />;
 }

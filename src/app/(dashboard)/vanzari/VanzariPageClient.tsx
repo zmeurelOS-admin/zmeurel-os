@@ -22,20 +22,17 @@ import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog';
 
 interface Client {
   id: string;
-  id_client: string;
-  nume_client: string;
+  nume: string;
 }
 
 interface VanzariPageClientProps {
   initialVanzari: Vanzare[];
   clienti: Client[];
-  tenantId: string;
 }
 
 export function VanzariPageClient({
   initialVanzari,
   clienti,
-  tenantId,
 }: VanzariPageClientProps) {
   const queryClient = useQueryClient();
 
@@ -65,7 +62,7 @@ export function VanzariPageClient({
   const clientMap = useMemo(() => {
     const map: Record<string, string> = {};
     clienti.forEach((c) => {
-      map[c.id] = `${c.id_client} - ${c.nume_client}`;
+      map[c.id] = c.nume;
     });
     return map;
   }, [clienti]);

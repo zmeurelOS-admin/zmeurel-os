@@ -26,7 +26,7 @@ export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
             </div>
             <div>
               <CardTitle className="text-lg font-semibold">
-                {client.nume}
+                {client.nume_client}
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 ID: {client.id}
@@ -119,7 +119,7 @@ export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
             variant="outline"
             size="sm"
             style={{ color: '#ef4444', borderColor: '#ef4444' }}
-            onClick={() => onDelete(client.id, client.nume)}
+            onClick={() => onDelete(client.id, client.nume_client)}
           >
             <Trash2 className="w-4 h-4" />
           </Button>

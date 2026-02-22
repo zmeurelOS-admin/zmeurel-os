@@ -69,7 +69,7 @@ export function AddClientDialog({
       form.reset();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error creating client:', error);
+      console.error('Error creating client:', JSON.stringify(error, null, 2));
     } finally {
       setIsSubmitting(false);
     }

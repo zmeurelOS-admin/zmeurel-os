@@ -3,7 +3,6 @@ import { createClient } from '../client';
 
 export interface Cheltuiala {
   id: string;
-  tenant_id: string;
   id_cheltuiala: string;
   data: string;
   categorie: string | null;
@@ -83,7 +82,7 @@ export async function getCheltuieli(): Promise<Cheltuiala[]> {
     throw error;
   }
 
-  return data || [];
+  return data ?? [];
 }
 
 /**

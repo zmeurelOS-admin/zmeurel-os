@@ -6,7 +6,6 @@ export const STATUS_PLATA = ['Plătit', 'Restanță', 'Avans'] as const;
 
 export interface Vanzare {
   id: string;
-  tenant_id: string;
   id_vanzare: string;
   data: string;
   client_id: string | null;

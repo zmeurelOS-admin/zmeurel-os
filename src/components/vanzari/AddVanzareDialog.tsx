@@ -157,7 +157,7 @@ export function AddVanzareDialog({}: AddVanzareDialogProps) {
               <option value="">Fără client specificat</option>
               {clienti.map((client) => (
                 <option key={client.id} value={client.id}>
-                  {client.id} - {client.nume}
+                  {client.id} - {client.nume_client}
                   {client.pret_negociat_lei_kg && ` (${client.pret_negociat_lei_kg} lei/kg)`}
                 </option>
               ))}

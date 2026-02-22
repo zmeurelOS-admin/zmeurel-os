@@ -69,7 +69,7 @@ export function EditClientDialog({
   useEffect(() => {
     if (client && open) {
       form.reset({
-        nume: client.nume,
+        nume: client.nume_client,
         telefon: client.telefon || '',
         email: client.email || '',
         adresa: client.adresa || '',

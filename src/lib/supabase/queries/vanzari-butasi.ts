@@ -10,7 +10,6 @@ export interface VanzareButasi {
   id: string
   id_vanzare_butasi: string
   data: string
-  tenant_id: string
 
   client_id: string | null
   parcela_sursa_id: string | null
@@ -46,6 +45,40 @@ export interface UpdateVanzareButasiInput {
 }
 
 // ===============================
+// GENERATE NEXT ID
+// ===============================
+
+async function generateNextId(): Promise<string> {
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from('vanzari_butasi')
+    .select('id_vanzare_butasi')
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (error) {
+    console.error('Error fetching last vanzare butasi ID:', error)
+    return 'VB001'
+  }
+
+  if (!data || data.length === 0) {
+    return 'VB001'
+  }
+
+  const lastId = data[0].id_vanzare_butasi
+  const numericPart = parseInt(lastId.replace('VB', ''), 10)
+
+  if (isNaN(numericPart)) {
+    console.error('Invalid ID format:', lastId)
+    return 'VB001'
+  }
+
+  const nextNumber = numericPart + 1
+  return `VB${nextNumber.toString().padStart(3, '0')}`
+}
+
+// ===============================
 // GET
 // ===============================
 
@@ -70,10 +103,20 @@ export async function createVanzareButasi(
   input: CreateVanzareButasiInput
 ): Promise<VanzareButasi> {
   const supabase = createClient()
+  const nextId = await generateNextId()
 
   const { data, error } = await supabase
     .from('vanzari_butasi')
-    .insert(input)
+    .insert({
+      id_vanzare_butasi: nextId,
+      data: input.data,
+      client_id: input.client_id || null,
+      parcela_sursa_id: input.parcela_sursa_id || null,
+      soi_butasi: input.soi_butasi,
+      cantitate_butasi: input.cantitate_butasi,
+      pret_unitar_lei: input.pret_unitar_lei,
+      observatii: input.observatii || null,
+    })
     .select()
     .single()
 

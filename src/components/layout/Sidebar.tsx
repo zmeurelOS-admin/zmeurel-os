@@ -15,10 +15,11 @@ import {
   LayoutDashboard,
   Menu,
   X,
-  LogOut,
   Leaf,
   ShoppingBag,
 } from 'lucide-react';
+
+import LogoutButton from '@/components/LogoutButton'; // ✅ IMPORT ADĂUGAT
 
 const navGroups = [
   {
@@ -119,12 +120,8 @@ function SidebarContent({ isActive, onNavigate }: SidebarContentProps) {
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-white/10">
-        <button className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all w-full">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-            <LogOut className="w-4 h-4" />
-          </div>
-          Deconectare
-        </button>
+        {/* 🔥 AICI ESTE FIXUL */}
+        <LogoutButton />
       </div>
     </div>
   );

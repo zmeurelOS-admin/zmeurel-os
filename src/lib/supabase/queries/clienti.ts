@@ -21,6 +21,23 @@ export interface UpdateClientInput {
   observatii?: string | null
 }
 
+async function generateNextId(supabase: ReturnType<typeof createClient>): Promise<string> {
+  const { data, error } = await supabase
+    .from("clienti")
+    .select("id_client")
+    .order("created_at", { ascending: true })
+
+  if (error) throw error
+
+  const ids = (data ?? [])
+    .map((r) => r.id_client)
+    .filter((id) => id && /^C\d+$/.test(id))
+    .map((id) => parseInt(id!.substring(1)))
+
+  const maxId = ids.length > 0 ? Math.max(...ids) : 0
+  return `C${String(maxId + 1).padStart(3, "0")}`
+}
+
 export async function getClienti(): Promise<Client[]> {
   const supabase = createClient()
 
@@ -36,9 +53,12 @@ export async function getClienti(): Promise<Client[]> {
 export async function createClienti(input: CreateClientInput): Promise<Client> {
   const supabase = createClient()
 
+  const id_client = await generateNextId(supabase)
+
   const { data, error } = await supabase
     .from("clienti")
     .insert({
+      id_client,
       nume_client: input.nume_client,
       telefon: input.telefon ?? null,
       email: input.email ?? null,
