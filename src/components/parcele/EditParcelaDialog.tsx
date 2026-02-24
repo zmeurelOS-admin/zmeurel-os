@@ -78,7 +78,7 @@ export function EditParcelaDialog({
         soi_plantat: parcela.soi_plantat || '',
         an_plantare: parcela.an_plantare.toString(),
         nr_plante: parcela.nr_plante?.toString() || '',
-        status: parcela.status,
+        status: parcela.status ?? '',
         observatii: parcela.observatii || '',
       });
     }

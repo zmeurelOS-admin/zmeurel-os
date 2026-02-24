@@ -40,63 +40,62 @@ export function ParcelaPageClient({
     initialData: initialParcele,
   });
 
+  
   const createMutation = useMutation({
-    mutationFn: (data: ParcelaFormData) =>
-      createParcela({
-        nume_parcela: data.nume_parcela,
-        suprafata_m2: Number(data.suprafata_m2),
-        soi_plantat: data.soi_plantat || null,
-        an_plantare: Number(data.an_plantare),
-        nr_plante: data.nr_plante ? Number(data.nr_plante) : null,
-        status: data.status,
-        gps_lat: data.gps_lat ? Number(data.gps_lat) : null,
-        gps_lng: data.gps_lng ? Number(data.gps_lng) : null,
-        observatii: data.observatii || null,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['parcele'] });
-      toast.success('Parcelă adăugată');
-    },
-  });
+  mutationFn: (data: ParcelaFormData) => {
+    return createParcela({
+      id_parcela: `P-${Date.now()}`,
 
-  const updateMutation = useMutation({
-    mutationFn: ({
-      id,
-      payload,
-    }: {
-      id: string;
-      payload: ParcelaFormData;
-    }) =>
-      updateParcela(id, {
-        nume_parcela: payload.nume_parcela,
-        suprafata_m2: Number(payload.suprafata_m2),
-        soi_plantat: payload.soi_plantat || null,
-        an_plantare: Number(payload.an_plantare),
-        nr_plante: payload.nr_plante
-          ? Number(payload.nr_plante)
-          : null,
-        status: payload.status,
-        gps_lat: payload.gps_lat ? Number(payload.gps_lat) : null,
-        gps_lng: payload.gps_lng ? Number(payload.gps_lng) : null,
-        observatii: payload.observatii || null,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['parcele'] });
-      toast.success('Parcelă actualizată');
-    },
-  });
+      nume_parcela: data.nume_parcela,
+      suprafata_m2: Number(data.suprafata_m2),
+      soi_plantat: data.soi_plantat || null,
+      an_plantare: Number(data.an_plantare),
+      nr_plante: data.nr_plante ? Number(data.nr_plante) : null,
+      status: data.status,
+      gps_lat: data.gps_lat ? Number(data.gps_lat) : null,
+      gps_lng: data.gps_lng ? Number(data.gps_lng) : null,
+      observatii: data.observatii || null,
+    });
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['parcele'] });
+    toast.success('Parcelă adăugată');
+  },
+});
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteParcela(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['parcele'] });
-      toast.success('Parcelă ștearsă');
-    },
-  });
+const updateMutation = useMutation({
+  mutationFn: ({ id, payload }: { id: string; payload: ParcelaFormData }) => {
+    return updateParcela(id, {
+      nume_parcela: payload.nume_parcela,
+      suprafata_m2: Number(payload.suprafata_m2),
+      soi_plantat: payload.soi_plantat || null,
+      an_plantare: Number(payload.an_plantare),
+      nr_plante: payload.nr_plante ? Number(payload.nr_plante) : null,
+      status: payload.status,
+      gps_lat: payload.gps_lat ? Number(payload.gps_lat) : null,
+      gps_lng: payload.gps_lng ? Number(payload.gps_lng) : null,
+      observatii: payload.observatii || null,
+    });
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['parcele'] });
+    toast.success('Parcelă actualizată');
+  },
+});
 
-  const filtered = parcele.filter((p) =>
-    p.nume_parcela.toLowerCase().includes(search.toLowerCase())
-  );
+const deleteMutation = useMutation({
+  mutationFn: (id: string) => {
+    return deleteParcela(id);
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['parcele'] });
+    toast.success('Parcelă ștearsă');
+  },
+});
+
+const filtered = parcele.filter((p) =>
+  p.nume_parcela.toLowerCase().includes(search.toLowerCase())
+);
 
   return (
     <>

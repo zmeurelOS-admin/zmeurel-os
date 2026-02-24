@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/client"
-import type { Tables, Inserts, Updates } from "@/types/supabase"
+import type { Tables, TablesInsert, TablesUpdate } from "@/types/supabase"
 
 export type Parcela = Tables<"parcele">
-export type ParcelaInsert = Inserts<"parcele">
-export type ParcelaUpdate = Updates<"parcele">
+export type ParcelaInsert = TablesInsert<"parcele">
+export type ParcelaUpdate = TablesUpdate<"parcele">
 
 // =====================
 // GET
