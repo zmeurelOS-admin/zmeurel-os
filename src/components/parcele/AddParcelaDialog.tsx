@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { Plus, Loader2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createParcela } from '@/lib/supabase/queries/parcele';
 import {
   Dialog,
   DialogContent,
@@ -17,21 +17,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { ParcelaForm, type ParcelaFormData } from './ParcelaForm';
 
 const parcelaSchema = z.object({
   nume_parcela: z.string().min(1, 'Numele parcelei este obligatoriu'),
-  suprafata_m2: z.string().min(1, 'Suprafata este obligatorie'),
+  suprafata_m2: z.string().min(1, 'Suprafața este obligatorie'),
   soi_plantat: z.string().optional(),
-  an_plantare: z.string().min(1, 'Anul plantarii este obligatoriu'),
+  an_plantare: z.string().min(1, 'Anul plantării este obligatoriu'),
   nr_plante: z.string().optional(),
+  status: z.string().default('Activ'),
   observatii: z.string().optional(),
 });
-
-type ParcelaFormData = z.infer<typeof parcelaSchema>;
 
 interface AddParcelaDialogProps {
   soiuriDisponibile: string[];
@@ -53,39 +50,26 @@ export function AddParcelaDialog({
       soi_plantat: '',
       an_plantare: String(new Date().getFullYear()),
       nr_plante: '',
+      status: 'Activ',
       observatii: '',
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: ParcelaFormData) => {
-      const supabase = createClient();
-
-      const nextId = `P${Date.now()}`;
-
-      const { data: result, error: insertError } = await supabase
-        .from('parcele')
-        .insert({
-          id_parcela: nextId,
-          nume_parcela: data.nume_parcela,
-          suprafata_m2: Number(data.suprafata_m2),
-          soi_plantat: data.soi_plantat || null,
-          an_plantare: Number(data.an_plantare),
-          nr_plante: data.nr_plante ? Number(data.nr_plante) : null,
-          status: 'Activ',
-          gps_lat: null,
-          gps_lng: null,
-          observatii: data.observatii || null,
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-      return result;
+      return createParcela({
+        nume_parcela: data.nume_parcela,
+        suprafata_m2: Number(data.suprafata_m2),
+        soi_plantat: data.soi_plantat || undefined,
+        an_plantare: Number(data.an_plantare),
+        nr_plante: data.nr_plante ? Number(data.nr_plante) : undefined,
+        status: data.status,
+        observatii: data.observatii || undefined,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['parcele'] });
-      toast.success('Parcela a fost adaugata cu succes!');
+      toast.success('Parcela a fost adăugată cu succes!');
       form.reset();
       setOpen(false);
       onSuccess();
@@ -102,70 +86,40 @@ export function AddParcelaDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="bg-[#F16B6B] hover:bg-[#ef4444] min-h-12">
+        <Button size="lg" className="w-full h-14 rounded-2xl shadow-sm">
           <Plus className="h-5 w-5 mr-2" />
-          Adauga Parcela
+          Adaugă Parcelă
         </Button>
       </DialogTrigger>
 
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Adauga Parcela Noua</DialogTitle>
+          <DialogTitle>Adaugă Parcelă Nouă</DialogTitle>
           <DialogDescription>
-            Completeaza detaliile parcelei. ID-ul se va genera automat.
+            Completează detaliile parcelei. ID-ul se va genera automat.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="nume_parcela">Nume Parcela *</Label>
-            <Input id="nume_parcela" {...form.register('nume_parcela')} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="suprafata_m2">Suprafata (m2) *</Label>
-            <Input id="suprafata_m2" type="number" {...form.register('suprafata_m2')} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="soi_plantat">Soi Plantat</Label>
-            <select id="soi_plantat" {...form.register('soi_plantat')}>
-              <option value="">Selecteaza soi...</option>
-              {soiuriDisponibile.map((soi, index) => (
-                <option key={`${soi}-${index}`} value={soi}>
-                  {soi}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="an_plantare">An Plantare *</Label>
-            <Input id="an_plantare" type="number" {...form.register('an_plantare')} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="nr_plante">Numar Plante</Label>
-            <Input id="nr_plante" type="number" {...form.register('nr_plante')} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="observatii">Observatii</Label>
-            <Textarea id="observatii" {...form.register('observatii')} />
-          </div>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <ParcelaForm form={form} soiuriDisponibile={soiuriDisponibile} />
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Anuleaza
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={createMutation.isPending}
+            >
+              Anulează
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
               {createMutation.isPending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Se salveaza...
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Se salvează...
                 </>
               ) : (
-                'Salveaza Parcela'
+                'Salvează Parcela'
               )}
             </Button>
           </DialogFooter>

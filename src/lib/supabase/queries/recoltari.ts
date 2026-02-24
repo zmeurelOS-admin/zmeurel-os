@@ -11,10 +11,8 @@ export interface Recoltare {
   parcela_id: string | null
   culegator_id: string | null
   cantitate_kg: number
-  nr_caserole: number
-  tara_kg: number
   observatii: string | null
-  tenant_id: string // Am adăugat tenant_id în interfață
+  tenant_id: string
   created_at: string
   updated_at: string
 }
@@ -24,8 +22,6 @@ export interface CreateRecoltareInput {
   parcela_id: string
   culegator_id: string
   cantitate_kg: number
-  nr_caserole?: number
-  tara_kg?: number
   observatii?: string
 }
 
@@ -34,8 +30,6 @@ export interface UpdateRecoltareInput {
   parcela_id?: string
   culegator_id?: string
   cantitate_kg?: number
-  nr_caserole?: number
-  tara_kg?: number
   observatii?: string
 }
 
@@ -86,14 +80,18 @@ export async function createRecoltare(
   input: CreateRecoltareInput
 ): Promise<Recoltare> {
   const supabase = createClient()
-  
-  // 1. Aflăm cine este utilizatorul logat
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) throw new Error("Trebuie să fii autentificat pentru a adăuga date.")
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    throw new Error('Trebuie să fii autentificat pentru a adăuga date.')
+  }
 
   const nextId = await generateNextId()
 
-  // 2. Trimitem tenant_id: user.id către baza de date
   const { data, error } = await supabase
     .from('recoltari')
     .insert({
@@ -102,16 +100,14 @@ export async function createRecoltare(
       parcela_id: input.parcela_id,
       culegator_id: input.culegator_id,
       cantitate_kg: input.cantitate_kg,
-      nr_caserole: input.nr_caserole ?? 1,
-      tara_kg: input.tara_kg ?? 0,
       observatii: input.observatii ?? null,
-      tenant_id: user.id, // <--- LACĂTUL DE SECURITATE
+      tenant_id: user.id,
     })
     .select()
     .single()
 
   if (error) {
-    console.error("Eroare la crearea recoltării:", error.message)
+    console.error('Eroare la crearea recoltării:', error.message)
     throw error
   }
 
@@ -142,10 +138,7 @@ export async function updateRecoltare(
 export async function deleteRecoltare(id: string): Promise<void> {
   const supabase = createClient()
 
-  const { error } = await supabase
-    .from('recoltari')
-    .delete()
-    .eq('id', id)
+  const { error } = await supabase.from('recoltari').delete().eq('id', id)
 
   if (error) throw error
 }

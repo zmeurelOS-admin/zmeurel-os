@@ -1,204 +1,150 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { Map, Search } from 'lucide-react'
+
 import {
   getParcele,
   createParcela,
   updateParcela,
   deleteParcela,
   type Parcela,
-} from '@/lib/supabase/queries/parcele';
-import { AddParcelaDialog } from '@/components/parcele/AddParcelaDialog';
+} from '@/lib/supabase/queries/parcele'
+
+import { AddParcelaDialog } from '@/components/parcele/AddParcelaDialog'
+import { Input } from '@/components/ui/input'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 interface ParcelaFormData {
-  nume_parcela: string;
-  suprafata_m2: number | string;
-  soi_plantat?: string;
-  an_plantare: number | string;
-  nr_plante?: number | string;
-  status: string;
-  gps_lat?: number | string;
-  gps_lng?: number | string;
-  observatii?: string;
+  nume_parcela: string
+  suprafata_m2: number | string
+  soi_plantat?: string
+  an_plantare: number | string
+  nr_plante?: number | string
+  status: string
+  gps_lat?: number | string
+  gps_lng?: number | string
+  observatii?: string
 }
 
 interface ParcelaPageClientProps {
-  initialParcele: Parcela[];
+  initialParcele: Parcela[]
 }
 
 export function ParcelaPageClient({
   initialParcele,
 }: ParcelaPageClientProps) {
-  const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
+  const queryClient = useQueryClient()
+  const [search, setSearch] = useState('')
 
   const { data: parcele = initialParcele, isLoading } = useQuery({
     queryKey: ['parcele'],
     queryFn: () => getParcele(),
     initialData: initialParcele,
-  });
+  })
 
-  
-  const createMutation = useMutation({
-  mutationFn: (data: ParcelaFormData) => {
-    return createParcela({
-      id_parcela: `P-${Date.now()}`,
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteParcela(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parcele'] })
+      toast.success('Parcelă ștearsă')
+    },
+  })
 
-      nume_parcela: data.nume_parcela,
-      suprafata_m2: Number(data.suprafata_m2),
-      soi_plantat: data.soi_plantat || null,
-      an_plantare: Number(data.an_plantare),
-      nr_plante: data.nr_plante ? Number(data.nr_plante) : null,
-      status: data.status,
-      gps_lat: data.gps_lat ? Number(data.gps_lat) : null,
-      gps_lng: data.gps_lng ? Number(data.gps_lng) : null,
-      observatii: data.observatii || null,
-    });
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['parcele'] });
-    toast.success('Parcelă adăugată');
-  },
-});
-
-const updateMutation = useMutation({
-  mutationFn: ({ id, payload }: { id: string; payload: ParcelaFormData }) => {
-    return updateParcela(id, {
-      nume_parcela: payload.nume_parcela,
-      suprafata_m2: Number(payload.suprafata_m2),
-      soi_plantat: payload.soi_plantat || null,
-      an_plantare: Number(payload.an_plantare),
-      nr_plante: payload.nr_plante ? Number(payload.nr_plante) : null,
-      status: payload.status,
-      gps_lat: payload.gps_lat ? Number(payload.gps_lat) : null,
-      gps_lng: payload.gps_lng ? Number(payload.gps_lng) : null,
-      observatii: payload.observatii || null,
-    });
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['parcele'] });
-    toast.success('Parcelă actualizată');
-  },
-});
-
-const deleteMutation = useMutation({
-  mutationFn: (id: string) => {
-    return deleteParcela(id);
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['parcele'] });
-    toast.success('Parcelă ștearsă');
-  },
-});
-
-const filtered = parcele.filter((p) =>
-  p.nume_parcela.toLowerCase().includes(search.toLowerCase())
-);
+  const filtered = parcele.filter((p) =>
+    p.nume_parcela.toLowerCase().includes(search.toLowerCase())
+  )
 
   return (
-    <>
-      {/* Desktop layout */}
-      <div className="hidden lg:block" style={{ padding: 24 }}>
-        <h1>Parcele</h1>
-
-        <input
-          placeholder="Caută parcelă..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ padding: 8, marginBottom: 16, width: 300 }}
-        />
-
-        {isLoading && <p>Se încarcă...</p>}
-
-        {!isLoading &&
-          filtered.map((p) => (
-            <div
-              key={p.id}
-              style={{
-                border: '1px solid #ddd',
-                padding: 12,
-                marginBottom: 8,
-                borderRadius: 6,
-              }}
-            >
-              <div>
-                <strong>{p.nume_parcela}</strong>
-              </div>
-
-              <div>{p.suprafata_m2} m²</div>
-
-              <div>Status: {p.status}</div>
-
-              <button
-                onClick={() => deleteMutation.mutate(p.id)}
-                style={{ marginTop: 8 }}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-
-        <div style={{ marginTop: 16 }}>
-          <AddParcelaDialog
-            soiuriDisponibile={['Delniwa', 'Maravilla', 'Enrosadira', 'Husaria']}
-            onSuccess={() => {
-              queryClient.invalidateQueries({ queryKey: ['parcele'] });
-            }}
-          />
+    <div className="min-h-screen bg-muted/30 pb-32">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-emerald-900 to-emerald-800 rounded-b-[40px] px-6 pt-14 pb-20 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-black text-white">Parcele</h1>
+            <p className="text-sm text-emerald-100 mt-1">
+              Administrează terenurile cultivate.
+            </p>
+          </div>
+          <div className="bg-white/20 p-3 rounded-xl">
+            <Map className="h-6 w-6 text-white" />
+          </div>
         </div>
       </div>
 
-      {/* Mobile layout */}
-      <div className="lg:hidden space-y-4 pb-24">
-        <input
-          placeholder="Caută parcelă..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-12 text-base rounded-xl border border-slate-300 px-4"
-        />
+      <div className="px-5 -mt-10 space-y-8">
+        {/* Search */}
+        <Card className="p-4 rounded-2xl shadow-sm">
+          <div className="flex items-center gap-3">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Caută parcelă..."
+              className="border-none shadow-none focus-visible:ring-0"
+            />
+          </div>
+        </Card>
 
-        <div className="w-full">
-          <AddParcelaDialog
-            soiuriDisponibile={['Delniwa', 'Maravilla', 'Enrosadira', 'Husaria']}
-            onSuccess={() => {
-              queryClient.invalidateQueries({ queryKey: ['parcele'] });
-            }}
-          />
-        </div>
+        {/* Loading */}
+        {isLoading && (
+          <p className="text-center text-muted-foreground">Se încarcă...</p>
+        )}
 
-        {isLoading && <p className="text-center text-slate-600">Se încarcă...</p>}
-
+        {/* List */}
         {!isLoading &&
           filtered.map((p) => (
-            <div
+            <Card
               key={p.id}
-              className="rounded-2xl shadow-md p-4 bg-white"
+              className="p-5 rounded-2xl shadow-sm space-y-2"
             >
-              <div className="text-lg font-bold text-slate-900">
-                {p.nume_parcela}
-              </div>
-              <div className="text-sm text-slate-600 mt-1">
+              <div className="text-lg font-bold">{p.nume_parcela}</div>
+
+              <div className="text-sm text-muted-foreground">
                 {p.suprafata_m2} m²
               </div>
-              <div className="text-sm text-slate-600">
+
+              <div className="text-sm text-muted-foreground">
                 Status: {p.status}
               </div>
+
               {p.soi_plantat && (
-                <div className="text-sm text-slate-600">
+                <div className="text-sm text-muted-foreground">
                   Soi: {p.soi_plantat}
                 </div>
               )}
-              <button
-                onClick={() => deleteMutation.mutate(p.id)}
-                className="mt-3 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium"
-              >
-                Șterge
-              </button>
-            </div>
+
+              <div className="pt-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => deleteMutation.mutate(p.id)}
+                  disabled={deleteMutation.isPending}
+                >
+                  Șterge
+                </Button>
+              </div>
+            </Card>
           ))}
       </div>
-    </>
-  );
+
+      {/* Floating Action */}
+      <div className="fixed left-5 right-5 bottom-28 z-50">
+        <AddParcelaDialog
+          soiuriDisponibile={[
+            'Delniwa',
+            'Maravilla',
+            'Enrosadira',
+            'Husaria',
+          ]}
+          onSuccess={() =>
+            queryClient.invalidateQueries({ queryKey: ['parcele'] })
+          }
+        />
+      </div>
+    </div>
+  )
 }

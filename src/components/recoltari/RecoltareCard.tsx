@@ -41,10 +41,8 @@ export function RecoltareCard({
     }).format(num);
   };
 
-  // Calcule automate
-  const cantitateBrutaKg = recoltare.nr_caserole * 0.5; // 1 caserola = 0.5 kg
-  const cantitateNetaKg = cantitateBrutaKg - recoltare.tara_kg;
-  const valoareMuncaLei = culegatorTarif ? cantitateNetaKg * culegatorTarif : 0;
+  // Calculare valoare muncă
+  const valoareMuncaLei = culegatorTarif ? recoltare.cantitate_kg * culegatorTarif : 0;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -104,34 +102,15 @@ export function RecoltareCard({
       </CardHeader>
 
       <CardContent className="pt-0">
-        {/* Cantități */}
-        <div className="grid grid-cols-3 gap-2 mb-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+        {/* Cantitate */}
+        <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
           <div className="text-center">
-            <div className="text-xs text-gray-600 mb-1">Caserole</div>
-            <div className="text-lg font-bold text-gray-900">
-              {recoltare.nr_caserole}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-xs text-gray-600 mb-1">Brut (kg)</div>
-            <div className="text-lg font-bold text-blue-600">
-              {formatNumber(cantitateBrutaKg)}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-xs text-gray-600 mb-1">Net (kg)</div>
-            <div className="text-lg font-bold text-blue-700">
-              {formatNumber(cantitateNetaKg)}
+            <div className="text-xs text-gray-600 mb-1">Cantitate (kg)</div>
+            <div className="text-2xl font-bold text-blue-700">
+              {formatNumber(recoltare.cantitate_kg)}
             </div>
           </div>
         </div>
-
-        {/* Tară (dacă există) */}
-        {recoltare.tara_kg > 0 && (
-          <div className="text-sm mb-2 text-gray-600">
-            Tară: {formatNumber(recoltare.tara_kg)} kg
-          </div>
-        )}
 
         {/* Valoare Muncă (dacă există tarif) */}
         {culegatorTarif && culegatorTarif > 0 && (

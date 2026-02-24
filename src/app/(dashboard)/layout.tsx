@@ -1,9 +1,14 @@
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MobileShell } from '@/components/mobile/MobileShell'
+import { Providers } from '../providers'
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <>
+    <Providers>
       {/* Desktop */}
       <div className="hidden lg:flex min-h-screen">
         <Sidebar />
@@ -18,6 +23,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </MobileShell>
       </div>
-    </>
+    </Providers>
   )
 }

@@ -123,7 +123,7 @@ function useKPIs() {
 
         const totalRecoltatAzi = recoltari
           .filter((r) => r.data === today)
-          .reduce((sum, r) => sum + r.tara_kg, 0);
+          .reduce((sum, r) => sum + r.cantitate_kg, 0);
 
         const totalVanzariAzi = vanzari
           .filter((v) => v.data === today)
@@ -163,8 +163,8 @@ function useActivityFeed() {
             id: r.id,
             type: 'recoltare',
             title: `Recoltare ${r.id_recoltare}`,
-            subtitle: `${r.nr_caserole} caserole · ${r.tara_kg} kg`,
-            value: `${r.tara_kg} kg`,
+            subtitle: `${r.cantitate_kg} kg`,
+            value: `${r.cantitate_kg} kg`,
             date: r.data,
           });
         });
