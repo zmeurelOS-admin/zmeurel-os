@@ -42,3 +42,14 @@ next-env.d.ts
 
 .vercel
 .env*.local
+# Playwright
+test-results/
+playwright-report/
+*.webm
+*.png
+
+# Archives / exports
+*.zip
+
+# Local generated files
+repomix-output.xml
