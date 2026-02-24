@@ -31,9 +31,17 @@ export async function createParcela(
 ): Promise<Parcela> {
   const supabase = createClient()
 
+  // 1. Verificăm cine este userul real direct pe "server" (clientul Supabase securizat)
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) throw new Error("Neautorizat. Trebuie să fii logat.")
+
+  // 2. Suprascriem tenant_id cu ID-ul real, ca să nu poată fi falsificat
   const { data, error } = await supabase
     .from("parcele")
-    .insert(input)
+    .insert({
+      ...input,
+      tenant_id: user.id // <--- LACĂTUL TĂU AICI
+    })
     .select("*")
     .single()
 

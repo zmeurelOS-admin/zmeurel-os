@@ -65,26 +65,25 @@ export interface UpdateActivitateAgricolaInput {
 async function generateNextId(): Promise<string> {
   const supabase = createClient()
 
+  // luăm doar ID-urile care respectă formatul nou AA###
   const { data, error } = await supabase
     .from('activitati_agricole')
     .select('id_activitate')
-    .order('created_at', { ascending: false })
+    .like('id_activitate', 'AA%')
+    .order('id_activitate', { ascending: false })
     .limit(1)
 
-  if (error) {
-    console.error('Error fetching last activitate ID:', error)
-    throw error
-  }
+  if (error) throw error
 
-  if (!data || data.length === 0) {
+  if (!data || data.length === 0 || !data[0]?.id_activitate) {
     return 'AA001'
   }
 
-  const lastId = data[0].id_activitate
+  const lastId = data[0].id_activitate // ex: AA014
   const numericPart = parseInt(lastId.replace('AA', ''), 10)
 
-  if (isNaN(numericPart)) {
-    throw new Error(`Invalid id_activitate format: ${lastId}`)
+  if (Number.isNaN(numericPart)) {
+    return 'AA001'
   }
 
   const nextNumber = numericPart + 1
@@ -102,6 +101,7 @@ export async function getActivitatiAgricole(): Promise<ActivitateAgricola[]> {
     .from('activitati_agricole')
     .select('*')
     .order('data_aplicare', { ascending: false })
+.order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching activitati:', error)

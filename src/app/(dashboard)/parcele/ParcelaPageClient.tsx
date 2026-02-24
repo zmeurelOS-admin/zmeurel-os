@@ -99,54 +99,107 @@ export function ParcelaPageClient({
   );
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Parcele</h1>
+    <>
+      {/* Desktop layout */}
+      <div className="hidden lg:block" style={{ padding: 24 }}>
+        <h1>Parcele</h1>
 
-      <input
-        placeholder="Caută parcelă..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{ padding: 8, marginBottom: 16, width: 300 }}
-      />
-
-      {isLoading && <p>Se încarcă...</p>}
-
-      {!isLoading &&
-        filtered.map((p) => (
-          <div
-            key={p.id}
-            style={{
-              border: '1px solid #ddd',
-              padding: 12,
-              marginBottom: 8,
-              borderRadius: 6,
-            }}
-          >
-            <div>
-              <strong>{p.nume_parcela}</strong>
-            </div>
-
-            <div>{p.suprafata_m2} m²</div>
-
-            <div>Status: {p.status}</div>
-
-            <button
-              onClick={() => deleteMutation.mutate(p.id)}
-              style={{ marginTop: 8 }}
-            >
-              Delete
-            </button>
-          </div>
-        ))}
-
-      <div style={{ marginTop: 16 }}>
-        <AddParcelaDialog
-          soiuriDisponibile={['Delniwa', 'Maravilla', 'Enrosadira', 'Husaria']}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['parcele'] });
-          }}
+        <input
+          placeholder="Caută parcelă..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ padding: 8, marginBottom: 16, width: 300 }}
         />
+
+        {isLoading && <p>Se încarcă...</p>}
+
+        {!isLoading &&
+          filtered.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                border: '1px solid #ddd',
+                padding: 12,
+                marginBottom: 8,
+                borderRadius: 6,
+              }}
+            >
+              <div>
+                <strong>{p.nume_parcela}</strong>
+              </div>
+
+              <div>{p.suprafata_m2} m²</div>
+
+              <div>Status: {p.status}</div>
+
+              <button
+                onClick={() => deleteMutation.mutate(p.id)}
+                style={{ marginTop: 8 }}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+
+        <div style={{ marginTop: 16 }}>
+          <AddParcelaDialog
+            soiuriDisponibile={['Delniwa', 'Maravilla', 'Enrosadira', 'Husaria']}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['parcele'] });
+            }}
+          />
+        </div>
       </div>
-    </div>
+
+      {/* Mobile layout */}
+      <div className="lg:hidden space-y-4 pb-24">
+        <input
+          placeholder="Caută parcelă..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full h-12 text-base rounded-xl border border-slate-300 px-4"
+        />
+
+        <div className="w-full">
+          <AddParcelaDialog
+            soiuriDisponibile={['Delniwa', 'Maravilla', 'Enrosadira', 'Husaria']}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['parcele'] });
+            }}
+          />
+        </div>
+
+        {isLoading && <p className="text-center text-slate-600">Se încarcă...</p>}
+
+        {!isLoading &&
+          filtered.map((p) => (
+            <div
+              key={p.id}
+              className="rounded-2xl shadow-md p-4 bg-white"
+            >
+              <div className="text-lg font-bold text-slate-900">
+                {p.nume_parcela}
+              </div>
+              <div className="text-sm text-slate-600 mt-1">
+                {p.suprafata_m2} m²
+              </div>
+              <div className="text-sm text-slate-600">
+                Status: {p.status}
+              </div>
+              {p.soi_plantat && (
+                <div className="text-sm text-slate-600">
+                  Soi: {p.soi_plantat}
+                </div>
+              )}
+              <button
+                onClick={() => deleteMutation.mutate(p.id)}
+                className="mt-3 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium"
+              >
+                Șterge
+              </button>
+            </div>
+          ))}
+      </div>
+    </>
   );
 }

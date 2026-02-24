@@ -1,273 +1,137 @@
-// src/app/(dashboard)/activitati-agricole/ActivitatiAgricolePageClient.tsx
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
-import { Search, Sprout, AlertCircle, CheckCircle } from 'lucide-react'
-
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-
-import {
-  ActivitateAgricola,
-  getActivitatiAgricole,
-  deleteActivitateAgricola,
-  calculatePauseStatus,
-} from '@/lib/supabase/queries/activitati-agricole'
-
-import { ActivitateAgricolaCard } from '@/components/activitati-agricole/ActivitateAgricolaCard'
+import { useState } from 'react'
+import { Search, ClipboardList, Droplets, Scissors, Bug, Sprout, ArrowRight } from 'lucide-react'
 import { AddActivitateAgricolaDialog } from '@/components/activitati-agricole/AddActivitateAgricolaDialog'
-import { EditActivitateAgricolaDialog } from '@/components/activitati-agricole/EditActivitateAgricolaDialog'
-import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog'
 
-interface Parcela {
-  id: string
-  id_parcela: string
-  nume_parcela: string
-}
+export default function ActivitatiPage() {
+  const [searchQuery, setSearchQuery] = useState('')
 
-interface ActivitatiAgricolePageClientProps {
-  initialActivitati: ActivitateAgricola[]
-  parcele: Parcela[]
-}
-
-export function ActivitatiAgricolePageClient({
-  initialActivitati,
-  parcele,
-}: ActivitatiAgricolePageClientProps) {
-  const queryClient = useQueryClient()
-
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedMonth, setSelectedMonth] = useState<string>('all')
-  const [editingActivitate, setEditingActivitate] =
-    useState<ActivitateAgricola | null>(null)
-  const [deletingActivitate, setDeletingActivitate] =
-    useState<ActivitateAgricola | null>(null)
-
-  const { data: activitati = initialActivitati } = useQuery({
-    queryKey: ['activitati-agricole'],
-    queryFn: getActivitatiAgricole,
-    initialData: initialActivitati,
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteActivitateAgricola,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activitati-agricole'] })
-      toast.success('Activitate stearsa cu succes!')
-      setDeletingActivitate(null)
-    },
-    onError: (error) => {
-      console.error('Error deleting activitate:', error)
-      toast.error('Eroare la stergerea activitatii')
-    },
-  })
-
-  const parcelaMap = useMemo(() => {
-    const map: Record<string, string> = {}
-    parcele.forEach((p) => {
-      map[p.id] = `${p.id_parcela} - ${p.nume_parcela}`
-    })
-    return map
-  }, [parcele])
-
-  const availableMonths = useMemo(() => {
-    const months = new Set<string>()
-    activitati.forEach((a) => {
-      const date = new Date(a.data_aplicare)
-      const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1)
-        .toString()
-        .padStart(2, '0')}`
-      months.add(monthKey)
-    })
-    return Array.from(months).sort().reverse()
-  }, [activitati])
-
-  const formatMonth = (monthKey: string) => {
-    const [year, month] = monthKey.split('-')
-    const date = new Date(parseInt(year), parseInt(month) - 1)
-    return date.toLocaleDateString('ro-RO', {
-      year: 'numeric',
-      month: 'long',
-    })
-  }
-
-  const filteredActivitati = useMemo(() => {
-    let filtered = activitati
-
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      filtered = filtered.filter(
-        (a) =>
-          a.id_activitate.toLowerCase().includes(term) ||
-          a.tip_activitate?.toLowerCase().includes(term) ||
-          a.produs_utilizat?.toLowerCase().includes(term) ||
-          (a.parcela_id &&
-            parcelaMap[a.parcela_id]?.toLowerCase().includes(term)) ||
-          a.operator?.toLowerCase().includes(term) ||
-          a.observatii?.toLowerCase().includes(term)
-      )
-    }
-
-    if (selectedMonth !== 'all') {
-      filtered = filtered.filter((a) => {
-        const date = new Date(a.data_aplicare)
-        const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1)
-          .toString()
-          .padStart(2, '0')}`
-        return monthKey === selectedMonth
-      })
-    }
-
-    return filtered
-  }, [activitati, searchTerm, selectedMonth, parcelaMap])
-
-  const stats = useMemo(() => {
-    const total = filteredActivitati.length
-    let totalOK = 0
-    let totalPauza = 0
-
-    filteredActivitati.forEach((a) => {
-      if (a.timp_pauza_zile > 0) {
-        const { status } = calculatePauseStatus(
-          a.data_aplicare,
-          a.timp_pauza_zile
-        )
-        if (status === 'OK') totalOK++
-        else totalPauza++
-      }
-    })
-
-    return { total, totalOK, totalPauza }
-  }, [filteredActivitati])
-
-  const handleEdit = (activitate: ActivitateAgricola) => {
-    setEditingActivitate(activitate)
-  }
-
-  const handleDelete = (activitate: ActivitateAgricola) => {
-    setDeletingActivitate(activitate)
-  }
-
-  const confirmDelete = () => {
-    if (deletingActivitate) {
-      deleteMutation.mutate(deletingActivitate.id)
-    }
-  }
+  const categorii = [
+    { name: 'Tratamente', icon: Bug, color: '#EF4444', bg: '#FEF2F2' },
+    { name: 'Irigare', icon: Droplets, color: '#3B82F6', bg: '#EFF6FF' },
+    { name: 'Tăieri', icon: Scissors, color: '#F59E0B', bg: '#FFFBEB' },
+    { name: 'Fertilizare', icon: Sprout, color: '#10B981', bg: '#ECFDF5' },
+  ]
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Activitati Agricole
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Gestioneaza tratamente, fertilizari si alte activitati
-          </p>
+    <div
+      style={{
+        backgroundColor: '#F8F9FB',
+        width: '100%',
+        minHeight: '100%',
+        paddingBottom: 20,
+        overflow: 'hidden',
+        fontFamily: 'inherit',
+      }}
+    >
+      <div style={{ marginLeft: -16, marginRight: -16 }}>
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #064E3B 0%, #065F46 100%)',
+            padding: '60px 24px 80px 24px',
+            borderBottomLeftRadius: 45,
+            borderBottomRightRadius: 45,
+            boxShadow: '0 10px 30px rgba(6, 78, 59, 0.15)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0, color: 'white' }}>
+                Operațiuni
+              </h1>
+              <p style={{ opacity: 0.8, fontSize: 14, marginTop: 4, color: '#ECFDF5' }}>
+                Planifică și monitorizează cultura.
+              </p>
+            </div>
+            <div style={{ backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 18 }}>
+              <ClipboardList color="white" size={24} />
+            </div>
+          </div>
         </div>
-        <AddActivitateAgricolaDialog />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Activitati</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {stats.total}
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Sprout className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">
-                  Recoltare Permisa (OK)
-                </p>
-                <p className="text-3xl font-bold text-green-600 mt-1">
-                  {stats.totalOK}
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">
-                  In Pauza (ATENTIE)
-                </p>
-                <p className="text-3xl font-bold text-yellow-600 mt-1">
-                  {stats.totalPauza}
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div style={{ padding: '0 20px', marginTop: -30 }}>
+        <div
+          style={{
+            backgroundColor: 'white',
+            borderRadius: 20,
+            display: 'flex',
+            alignItems: 'center',
+            padding: '12px 16px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
+            border: '1px solid #eee',
+          }}
+        >
+          <Search size={18} color="#94a3b8" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Caută o intervenție..."
+            style={{
+              border: 'none',
+              outline: 'none',
+              marginLeft: 12,
+              width: '100%',
+              fontSize: 16,
+              fontFamily: 'inherit',
+            }}
+          />
+        </div>
       </div>
 
-      {filteredActivitati.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Sprout className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Nicio activitate gasita
-            </h3>
-            <p className="text-gray-600">
-              Adauga prima activitate agricola pentru a incepe tracking-ul
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredActivitati.map((activitate) => (
-            <ActivitateAgricolaCard
-              key={activitate.id}
-              activitate={activitate}
-              parcelaNume={
-                activitate.parcela_id
-                  ? parcelaMap[activitate.parcela_id]
-                  : undefined
-              }
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
+      <div style={{ padding: '24px 20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 32 }}>
+          {categorii.map((cat) => (
+            <div key={cat.name} style={{ textAlign: 'center' }}>
+              <div
+                style={{
+                  backgroundColor: cat.bg,
+                  width: '100%',
+                  aspectRatio: '1/1',
+                  borderRadius: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 6,
+                }}
+              >
+                <cat.icon size={22} color={cat.color} />
+              </div>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: '#64748b',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {cat.name}
+              </span>
+            </div>
           ))}
         </div>
-      )}
 
-      <EditActivitateAgricolaDialog
-        activitate={editingActivitate}
-        open={!!editingActivitate}
-        onOpenChange={(open) => !open && setEditingActivitate(null)}
-      />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>Istoric Lucrări</h2>
+          <ArrowRight size={20} color="#94a3b8" />
+        </div>
 
-      <DeleteConfirmDialog
-        open={!!deletingActivitate}
-        onOpenChange={(open) => !open && setDeletingActivitate(null)}
-        onConfirm={confirmDelete}
-        itemName={deletingActivitate?.id_activitate || ''}
-        itemType="activitate agricola"
-      />
+        <div
+          style={{
+            backgroundColor: 'white',
+            padding: 20,
+            borderRadius: 24,
+            border: '1px solid #eee',
+          }}
+        >
+          Exemplu activitate...
+        </div>
+      </div>
+
+      <div style={{ position: 'fixed', left: 20, right: 20, bottom: 140, zIndex: 100 }}>
+        <AddActivitateAgricolaDialog />
+      </div>
     </div>
   )
 }

@@ -1,266 +1,252 @@
-// src/components/activitati-agricole/EditActivitateAgricolaDialog.tsx
 'use client'
 
-import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-
+import { X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-
-import {
-  ActivitateAgricola,
+  type ActivitateAgricola,
   updateActivitateAgricola,
-  TIPURI_ACTIVITATI,
 } from '@/lib/supabase/queries/activitati-agricole'
 
-import { getParcele } from '@/lib/supabase/queries/parcele'
-
-// ===============================
-// VALIDATION
-// ===============================
-
-const activitateSchema = z.object({
-  data_aplicare: z.string().min(1, 'Data este obligatorie'),
-  parcela_id: z.string().optional(),
-  tip_activitate: z.string().min(1, 'Tipul este obligatoriu'),
-  produs_utilizat: z.string().optional(),
-  doza: z.string().optional(),
-  timp_pauza_zile: z.string().optional(),
-  operator: z.string().optional(),
-  observatii: z.string().optional(),
-})
-
-type ActivitateFormData = z.infer<typeof activitateSchema>
-
-type UpdateActivitateInput = {
-  data_aplicare: string
-  parcela_id?: string
-  tip_activitate: string
-  produs_utilizat?: string
-  doza?: string
-  timp_pauza_zile: number
-  operator?: string
-  observatii?: string
-}
-
-interface EditActivitateAgricolaDialogProps {
-  activitate: ActivitateAgricola | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
-
-// ===============================
-// COMPONENT
-// ===============================
+const supabase = createClient()
 
 export function EditActivitateAgricolaDialog({
   activitate,
   open,
   onOpenChange,
-}: EditActivitateAgricolaDialogProps) {
+}: {
+  activitate: ActivitateAgricola | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
   const queryClient = useQueryClient()
 
-  // RLS-first: fără tenantId
-  const { data: parcele = [] } = useQuery({
-    queryKey: ['parcele'],
-    queryFn: getParcele,
-  })
+  const [parcele, setParcele] = useState<any[]>([])
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ActivitateFormData>({
-    resolver: zodResolver(activitateSchema),
-  })
+  const [dataAplicare, setDataAplicare] = useState('')
+  const [parcelaId, setParcelaId] = useState('')
+  const [tipActivitate, setTipActivitate] = useState('')
+  const [produs, setProdus] = useState('')
+  const [doza, setDoza] = useState('')
+  const [timpPauza, setTimpPauza] = useState(0)
+  const [observatii, setObservatii] = useState('')
 
   useEffect(() => {
-    if (activitate && open) {
-      reset({
-        data_aplicare: activitate.data_aplicare.split('T')[0],
-        parcela_id: activitate.parcela_id ?? '',
-        tip_activitate: activitate.tip_activitate ?? '',
-        produs_utilizat: activitate.produs_utilizat ?? '',
-        doza: activitate.doza ?? '',
-        timp_pauza_zile: activitate.timp_pauza_zile.toString(),
-        operator: activitate.operator ?? '',
-        observatii: activitate.observatii ?? '',
-      })
-    }
-  }, [activitate, open, reset])
+    if (!open || !activitate) return
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateActivitateInput }) =>
-      updateActivitateAgricola(id, data),
+    setDataAplicare(
+      activitate.data_aplicare
+        ? new Date(activitate.data_aplicare).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0]
+    )
+    setParcelaId(activitate.parcela_id ?? '')
+    setTipActivitate(activitate.tip_activitate ?? '')
+    setProdus(activitate.produs_utilizat ?? '')
+    setDoza(activitate.doza ?? '')
+    setTimpPauza(
+      typeof activitate.timp_pauza_zile === 'number'
+        ? activitate.timp_pauza_zile
+        : 0
+    )
+    setObservatii(activitate.observatii ?? '')
+
+    loadParcele()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activitate?.id])
+
+  async function loadParcele() {
+    const { data } = await supabase.from('parcele').select('id, id_parcela')
+    if (data) setParcele(data)
+  }
+
+  const mutation = useMutation({
+    mutationFn: (payload: {
+      id: string
+      input: {
+        data_aplicare?: string
+        parcela_id?: string
+        tip_activitate?: string
+        produs_utilizat?: string
+        doza?: string
+        timp_pauza_zile?: number
+        observatii?: string
+      }
+    }) => updateActivitateAgricola(payload.id, payload.input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activitati-agricole'] })
-      toast.success('Activitate actualizată cu succes!')
+      queryClient.invalidateQueries({ queryKey: ['activitati'] })
+      toast.success('Activitate actualizată')
       onOpenChange(false)
     },
-    onError: (error) => {
-      console.error('Error updating activitate agricola:', error)
-      toast.error('Eroare la actualizarea activității')
+    onError: (error: any) => {
+      toast.error(error?.message || 'Eroare la actualizare')
     },
   })
 
-  const onSubmit = (data: ActivitateFormData) => {
-    if (!activitate) return
+  if (!open || !activitate) return null
 
-    const payload: UpdateActivitateInput = {
-      data_aplicare: data.data_aplicare,
-      parcela_id: data.parcela_id || undefined,
-      tip_activitate: data.tip_activitate,
-      produs_utilizat: data.produs_utilizat || undefined,
-      doza: data.doza || undefined,
-      timp_pauza_zile: data.timp_pauza_zile
-        ? Number(data.timp_pauza_zile)
-        : 0,
-      operator: data.operator || undefined,
-      observatii: data.observatii || undefined,
-    }
-
-    updateMutation.mutate({
-      id: activitate.id,
-      data: payload,
-    })
+  const fieldStyle: CSSProperties = {
+    width: '100%',
+    height: 44,
+    borderRadius: 16,
+    border: '1px solid #e5e7eb',
+    padding: '0 12px',
+    outline: 'none',
+    background: 'white',
+    fontSize: 14,
   }
 
-  if (!activitate) return null
+  const selectStyle: CSSProperties = {
+    ...fieldStyle,
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    MozAppearance: 'none',
+    paddingRight: 36,
+  }
+
+  const textAreaStyle: CSSProperties = {
+    width: '100%',
+    borderRadius: 16,
+    border: '1px solid #e5e7eb',
+    padding: '10px 12px',
+    outline: 'none',
+    background: 'white',
+    fontSize: 14,
+    minHeight: 84,
+    resize: 'vertical',
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto bg-white">
-        <DialogHeader>
-          <DialogTitle>
-            Editează Activitate: {activitate.id_activitate}
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pb-4">
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.4)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+      }}
+    >
+      <div
+        style={{
+          background: 'white',
+          width: '100%',
+          maxWidth: '420px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          borderRadius: '24px',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <div>
-            <Label htmlFor="data_aplicare">
-              Data aplicării <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="data_aplicare"
-              type="date"
-              {...register('data_aplicare')}
-              className={errors.data_aplicare ? 'border-red-500' : ''}
-            />
-            {errors.data_aplicare && (
-              <p className="text-sm text-red-500 mt-1">
-                {errors.data_aplicare.message}
-              </p>
-            )}
+            <h3 style={{ fontWeight: 900 }}>Editează operațiune</h3>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>
+              {activitate.id_activitate}
+            </div>
           </div>
 
-          <div>
-            <Label htmlFor="tip_activitate">
-              Tip activitate <span className="text-red-500">*</span>
-            </Label>
-            <select
-              id="tip_activitate"
-              {...register('tip_activitate')}
-              className={`flex h-10 w-full rounded-md border px-3 py-2 text-sm bg-white ${
-                errors.tip_activitate
-                  ? 'border-red-500'
-                  : 'border-gray-300'
-              }`}
-            >
-              <option value="">Selectează tipul...</option>
-              {TIPURI_ACTIVITATI.map((tip) => (
-                <option key={tip} value={tip}>
-                  {tip}
-                </option>
-              ))}
-            </select>
-          </div>
+          <X onClick={() => onOpenChange(false)} style={{ cursor: 'pointer' }} />
+        </div>
 
-          <div>
-            <Label htmlFor="parcela_id">Parcelă (opțional)</Label>
-            <select
-              id="parcela_id"
-              {...register('parcela_id')}
-              className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
-            >
-              <option value="">Fără parcelă specificată</option>
-              {parcele.map((parcela: any) => (
-                <option key={parcela.id} value={parcela.id}>
-                  {parcela.id_parcela} - {parcela.nume_parcela}
-                </option>
-              ))}
-            </select>
-          </div>
+        <input
+          type="date"
+          value={dataAplicare}
+          onChange={(e) => setDataAplicare(e.target.value)}
+          style={fieldStyle}
+        />
 
-          <div>
-            <Label htmlFor="produs_utilizat">
-              Produs utilizat (opțional)
-            </Label>
-            <Input
-              id="produs_utilizat"
-              type="text"
-              {...register('produs_utilizat')}
-            />
-          </div>
+        <select
+          value={parcelaId}
+          onChange={(e) => setParcelaId(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="">Selectează parcela</option>
+          {parcele.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.id_parcela}
+            </option>
+          ))}
+        </select>
 
-          <div>
-            <Label htmlFor="doza">Doză (opțional)</Label>
-            <Input id="doza" type="text" {...register('doza')} />
-          </div>
+        <select
+          value={tipActivitate}
+          onChange={(e) => setTipActivitate(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="">Tip operațiune</option>
+          <option value="fertilizare_foliara">Fertilizare foliară</option>
+          <option value="fertirigare">Fertirigare</option>
+          <option value="fertilizare_baza">Fertilizare de bază</option>
+          <option value="fungicide_pesticide">Fungicide/Pesticide</option>
+          <option value="irigatie">Irigatie</option>
+          <option value="altele">Altele</option>
+        </select>
 
-          <div>
-            <Label htmlFor="timp_pauza_zile">Timp pauză (zile)</Label>
-            <Input
-              id="timp_pauza_zile"
-              type="number"
-              min="0"
-              {...register('timp_pauza_zile')}
-            />
-          </div>
+        <input
+          placeholder="Produs"
+          value={produs}
+          onChange={(e) => setProdus(e.target.value)}
+          style={fieldStyle}
+        />
 
-          <div>
-            <Label htmlFor="operator">Operator (opțional)</Label>
-            <Input id="operator" type="text" {...register('operator')} />
-          </div>
+        <input
+          placeholder="Cantitate / doză"
+          value={doza}
+          onChange={(e) => setDoza(e.target.value)}
+          style={fieldStyle}
+        />
 
-          <div>
-            <Label htmlFor="observatii">Observații (opțional)</Label>
-            <Textarea id="observatii" rows={2} {...register('observatii')} />
-          </div>
+        <input
+          type="number"
+          placeholder="Timp pauză (zile)"
+          value={timpPauza}
+          onChange={(e) => setTimpPauza(Number(e.target.value))}
+          style={fieldStyle}
+        />
 
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Anulează
-            </Button>
-            <Button
-              type="submit"
-              disabled={updateMutation.isPending}
-              className="bg-[#F16B6B] hover:bg-[#E05A5A]"
-            >
-              {updateMutation.isPending
-                ? 'Se salvează...'
-                : 'Salvează'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        <textarea
+          placeholder="Observații"
+          value={observatii}
+          onChange={(e) => setObservatii(e.target.value)}
+          style={textAreaStyle}
+        />
+
+        <button
+          onClick={() =>
+            mutation.mutate({
+              id: activitate.id,
+              input: {
+                data_aplicare: dataAplicare,
+                parcela_id: parcelaId || undefined,
+                tip_activitate: tipActivitate || undefined,
+                produs_utilizat: produs || undefined,
+                doza: doza || undefined,
+                timp_pauza_zile: timpPauza,
+                observatii: observatii || undefined,
+              },
+            })
+          }
+          disabled={mutation.isPending}
+          style={{
+            padding: '16px',
+            background: '#0ea5e9',
+            border: 'none',
+            borderRadius: '16px',
+            color: 'white',
+            fontWeight: 900,
+            opacity: mutation.isPending ? 0.7 : 1,
+          }}
+        >
+          {mutation.isPending ? 'Se salvează...' : 'Salvează modificările'}
+        </button>
+      </div>
+    </div>
   )
 }
