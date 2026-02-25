@@ -1,8 +1,15 @@
 import type { Metadata, Viewport } from 'next'
+import { Inter } from 'next/font/google'
 
 import { HighVisibilityInit } from '@/components/app/HighVisibilityInit'
-import { ServiceWorkerRegister } from '@/components/app/ServiceWorkerRegister'
+import { MonitoringInit } from '@/components/app/MonitoringInit'
 import './globals.css'
+
+const inter = Inter({
+  subsets: ['latin', 'latin-ext'],
+  display: 'swap',
+  variable: '--font-inter',
+})
 
 export const metadata: Metadata = {
   title: 'Zmeurel',
@@ -30,7 +37,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#1f8f4a',
+  themeColor: '#166534',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -39,16 +46,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#166534" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Zmeurel" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
-      <body>
+      <body className={inter.variable}>
         <HighVisibilityInit />
-        <ServiceWorkerRegister />
+        <MonitoringInit />
         {children}
       </body>
     </html>
   )
 }
+

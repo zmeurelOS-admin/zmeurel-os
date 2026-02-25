@@ -51,6 +51,7 @@ body {
   overflow: hidden;
   background: var(--agri-bg);
   color: var(--agri-text);
+  font-family: var(--font-inter), "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 16px;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
