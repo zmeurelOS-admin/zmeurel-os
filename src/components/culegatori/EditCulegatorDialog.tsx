@@ -1,237 +1,160 @@
-﻿// src/components/culegatori/EditCulegatorDialog.tsx
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
-import type { Culegator } from '@/lib/supabase/queries/culegatori';
+import { useEffect, useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Loader2 } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import * as z from 'zod'
 
-// ========================================
-// ZOD VALIDATION SCHEMA
-// ========================================
+import { AppDialog } from '@/components/app/AppDialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import type { Culegator } from '@/lib/supabase/queries/culegatori'
 
 const culegatorSchema = z.object({
-  nume_prenume: z.string().min(2, 'Numele trebuie sÄ aibÄ minim 2 caractere'),
+  nume_prenume: z.string().trim().min(2, 'Numele trebuie sa aiba minim 2 caractere'),
   telefon: z.string().optional(),
-  tip_angajare: z.string().min(1, 'SelecteazÄ tipul de angajare'),
-  tarif_lei_kg: z.string().min(0, 'Tariful trebuie sÄ fie mai mare sau egal cu 0'),
+  tip_angajare: z.string().min(1, 'Selecteaza tipul de angajare'),
+  tarif_lei_kg: z.string().optional(),
   data_angajare: z.string().optional(),
   status_activ: z.boolean(),
-});
+  observatii: z.string().optional(),
+})
 
-type CulegatorFormData = z.infer<typeof culegatorSchema>;
-
-// ========================================
-// COMPONENT
-// ========================================
+type CulegatorFormData = z.infer<typeof culegatorSchema>
 
 interface EditCulegatorDialogProps {
-  culegator: Culegator | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (id: string, data: CulegatorFormData) => Promise<void>;
+  culegator: Culegator | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (id: string, data: CulegatorFormData) => Promise<void>
 }
 
-export function EditCulegatorDialog({
-  culegator,
-  open,
-  onOpenChange,
-  onSubmit,
-}: EditCulegatorDialogProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const defaults = (): CulegatorFormData => ({
+  nume_prenume: '',
+  telefon: '',
+  tip_angajare: 'Sezonier',
+  tarif_lei_kg: '0',
+  data_angajare: '',
+  status_activ: true,
+  observatii: '',
+})
+
+export function EditCulegatorDialog({ culegator, open, onOpenChange, onSubmit }: EditCulegatorDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<CulegatorFormData>({
     resolver: zodResolver(culegatorSchema),
-    defaultValues: {
-      nume_prenume: '',
-      telefon: '',
-      tip_angajare: 'Sezonier',
-      tarif_lei_kg: '0',
-      data_angajare: '',
-      status_activ: true,
-    },
-  });
+    defaultValues: defaults(),
+  })
 
-  // Populate form cĂ˘nd se deschide dialog-ul cu un culegÄtor
   useEffect(() => {
-    if (culegator && open) {
-      form.reset({
-        nume_prenume: culegator.nume_prenume,
-        telefon: culegator.telefon ?? '',
-        tip_angajare: culegator.tip_angajare ?? '',
-        tarif_lei_kg: culegator.tarif_lei_kg.toString(),
-        data_angajare: culegator.data_angajare ?? '',
-        status_activ: culegator.status_activ,
-      });
-    }
-  }, [culegator, open, form]);
+    if (!culegator || !open) return
+    form.reset({
+      nume_prenume: culegator.nume_prenume || '',
+      telefon: culegator.telefon || '',
+      tip_angajare: culegator.tip_angajare || 'Sezonier',
+      tarif_lei_kg: String(culegator.tarif_lei_kg ?? 0),
+      data_angajare: culegator.data_angajare || '',
+      status_activ: Boolean(culegator.status_activ),
+      observatii: culegator.observatii || '',
+    })
+  }, [culegator, open, form])
 
   const handleSubmit = async (data: CulegatorFormData) => {
-    if (!culegator) return;
-
-    setIsSubmitting(true);
+    if (!culegator) return
+    setIsSubmitting(true)
     try {
-      await onSubmit(culegator.id, data);
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Error updating culegator:', error);
+      await onSubmit(culegator.id, data)
+      onOpenChange(false)
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
-  if (!culegator) return null;
+  if (!culegator) return null
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="sm:max-w-[500px]"
-        style={{ backgroundColor: 'white' }}
-      >
-        <DialogHeader>
-          <DialogTitle>
-            EditeazÄ CulegÄtor: {culegator.nume_prenume}
-          </DialogTitle>
-        </DialogHeader>
+    <AppDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Editeaza culegator"
+      footer={
+        <div className="grid grid-cols-2 gap-3">
+          <Button type="button" variant="outline" className="agri-cta" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            Anuleaza
+          </Button>
+          <Button
+            type="button"
+            className="agri-cta bg-[var(--agri-primary)] text-white hover:bg-emerald-700"
+            onClick={form.handleSubmit(handleSubmit)}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salveaza'}
+          </Button>
+        </div>
+      }
+    >
+      <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
+        <div className="space-y-2">
+          <Label htmlFor="edit_culegator_nume">Nume si prenume</Label>
+          <Input id="edit_culegator_nume" className="agri-control h-12" {...form.register('nume_prenume')} />
+          {form.formState.errors.nume_prenume ? <p className="text-xs text-red-600">{form.formState.errors.nume_prenume.message}</p> : null}
+        </div>
 
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-          {/* Nume Prenume */}
-          <div className="space-y-2">
-            <Label htmlFor="nume_prenume">
-              Nume Č™i Prenume <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="nume_prenume"
-              {...form.register('nume_prenume')}
-              placeholder="Ex: Popescu Ion"
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-            {form.formState.errors.nume_prenume && (
-              <p className="text-sm text-red-500">
-                {form.formState.errors.nume_prenume.message}
-              </p>
-            )}
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit_culegator_telefon">Telefon</Label>
+          <Input id="edit_culegator_telefon" type="tel" className="agri-control h-12" {...form.register('telefon')} />
+        </div>
 
-          {/* Telefon */}
-          <div className="space-y-2">
-            <Label htmlFor="telefon">Telefon</Label>
-            <Input
-              id="telefon"
-              {...form.register('telefon')}
-              placeholder="Ex: 0740123456"
-              type="tel"
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit_culegator_tip">Tip angajare</Label>
+          <select id="edit_culegator_tip" className="agri-control h-12 w-full px-3 text-base" {...form.register('tip_angajare')}>
+            <option value="Sezonier">Sezonier</option>
+            <option value="Permanent">Permanent</option>
+            <option value="Zilier">Zilier</option>
+            <option value="Colaborator">Colaborator</option>
+          </select>
+        </div>
 
-          {/* Tip Angajare */}
-          <div className="space-y-2">
-            <Label htmlFor="tip_angajare">
-              Tip Angajare <span className="text-red-500">*</span>
-            </Label>
-            <select
-              id="tip_angajare"
-              {...form.register('tip_angajare')}
-              className="w-full rounded-md border border-input px-3 py-2 text-sm"
-              style={{ backgroundColor: 'white', color: 'black' }}
-            >
-              <option value="Sezonier">Sezonier</option>
-              <option value="Permanent">Permanent</option>
-              <option value="Zilier">Zilier</option>
-              <option value="Colaborator">Colaborator</option>
-            </select>
-            {form.formState.errors.tip_angajare && (
-              <p className="text-sm text-red-500">
-                {form.formState.errors.tip_angajare.message}
-              </p>
-            )}
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit_culegator_tarif">Tarif (lei/kg)</Label>
+          <Input
+            id="edit_culegator_tarif"
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            className="agri-control h-12"
+            {...form.register('tarif_lei_kg')}
+          />
+        </div>
 
-          {/* Tarif lei/kg */}
-          <div className="space-y-2">
-            <Label htmlFor="tarif_lei_kg">Tarif (lei/kg)</Label>
-            <Input
-              id="tarif_lei_kg"
-              {...form.register('tarif_lei_kg')}
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="Ex: 2.5 (0 = salarizat fix)"
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-            <p className="text-xs text-muted-foreground">
-              LasÄ 0 pentru culegÄtori salarizaČ›i fix (nu plÄtiČ›i la kg)
-            </p>
-            {form.formState.errors.tarif_lei_kg && (
-              <p className="text-sm text-red-500">
-                {form.formState.errors.tarif_lei_kg.message}
-              </p>
-            )}
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit_culegator_data">Data angajare</Label>
+          <Input id="edit_culegator_data" type="date" className="agri-control h-12" {...form.register('data_angajare')} />
+        </div>
 
-          {/* Data Angajare */}
-          <div className="space-y-2">
-            <Label htmlFor="data_angajare">Data Angajare</Label>
-            <Input
-              id="data_angajare"
-              {...form.register('data_angajare')}
-              type="date"
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-          </div>
+        <div className="flex items-center gap-2">
+          <input
+            id="edit_culegator_activ"
+            type="checkbox"
+            className="h-4 w-4 rounded border-gray-300"
+            checked={Boolean(form.watch('status_activ'))}
+            onChange={(event) => form.setValue('status_activ', event.target.checked, { shouldDirty: true })}
+          />
+          <Label htmlFor="edit_culegator_activ" className="cursor-pointer text-sm font-normal">
+            Culegator activ
+          </Label>
+        </div>
 
-          {/* Status Activ */}
-          <div className="flex items-center space-x-2">
-            <input
-              id="status_activ"
-              type="checkbox"
-              {...form.register('status_activ')}
-              className="w-4 h-4"
-            />
-            <Label htmlFor="status_activ" className="font-normal cursor-pointer">
-              CulegÄtor activ
-            </Label>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              AnuleazÄ
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              style={{ backgroundColor: '#F16B6B', color: 'white' }}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Se salveazÄ...
-                </>
-              ) : (
-                'SalveazÄ ModificÄri'
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+        <div className="space-y-2">
+          <Label htmlFor="edit_culegator_obs">Observatii</Label>
+          <Textarea id="edit_culegator_obs" rows={4} className="agri-control w-full px-3 py-2 text-base" {...form.register('observatii')} />
+        </div>
+      </form>
+    </AppDialog>
+  )
 }

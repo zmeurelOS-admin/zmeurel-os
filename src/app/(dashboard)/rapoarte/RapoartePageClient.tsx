@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { BarChart3, Download, FileSpreadsheet, FileText, Filter } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { AppShell } from '@/components/app/AppShell'
 import { EmptyState } from '@/components/app/EmptyState'
@@ -32,6 +33,7 @@ import { calculateProfit } from '@/lib/calculations/profit'
 import { trackEvent } from '@/lib/analytics/trackEvent'
 import { hasFeature } from '@/lib/subscription/plans'
 import { useMockPlan } from '@/lib/subscription/useMockPlan'
+import { calculatePauseStatus } from '@/lib/supabase/queries/activitati-agricole'
 
 type PeriodType = 'zi' | 'luna' | 'sezon' | 'custom'
 type ReportType =
@@ -88,6 +90,17 @@ interface ClientLite {
   nume_client: string | null
 }
 
+interface ActivitateLite {
+  id: string
+  data_aplicare: string
+  parcela_id: string | null
+  tip_activitate: string | null
+  produs_utilizat: string | null
+  doza: string | null
+  timp_pauza_zile: number
+  observatii: string | null
+}
+
 interface RapoartePageClientProps {
   initialRecoltari: RecoltareLite[]
   initialVanzari: VanzareLite[]
@@ -95,6 +108,7 @@ interface RapoartePageClientProps {
   initialParcele: ParcelaLite[]
   initialCulegatori: CulegatorLite[]
   initialClienti: ClientLite[]
+  initialActivitati: ActivitateLite[]
 }
 
 interface DetailRow {
@@ -127,6 +141,7 @@ export function RapoartePageClient({
   initialParcele,
   initialCulegatori,
   initialClienti,
+  initialActivitati,
 }: RapoartePageClientProps) {
   const { plan } = useMockPlan()
   const canAdvancedReports = hasFeature(plan, 'advanced_reports')
@@ -574,6 +589,84 @@ export function RapoartePageClient({
     trackEvent('export_raport', { format: 'season_csv', reportType: 'sezon_complet', rows: seasonRows.length })
   }
 
+  const exportTratamenteCsv = () => {
+    const rows = initialActivitati
+      .filter(
+        (activitate) =>
+          !!activitate.parcela_id &&
+          (!!activitate.produs_utilizat ||
+            !!activitate.tip_activitate ||
+            Number(activitate.timp_pauza_zile || 0) > 0)
+      )
+      .map((activitate) => {
+        const parcela = activitate.parcela_id ? parcelaMap[activitate.parcela_id] : null
+        const pause = calculatePauseStatus(
+          activitate.data_aplicare,
+          Number(activitate.timp_pauza_zile || 0)
+        )
+
+        return {
+          DataAplicare: new Date(activitate.data_aplicare).toLocaleDateString('ro-RO'),
+          Parcela: parcela?.nume_parcela || parcela?.id_parcela || 'Parcela necunoscuta',
+          TipActivitate: activitate.tip_activitate || '',
+          Produs: activitate.produs_utilizat || '',
+          Doza: activitate.doza || '',
+          TimpPauzaZile: String(activitate.timp_pauza_zile ?? 0),
+          DataRecoltarePermisa: pause.dataRecoltarePermisa,
+          StatusPauza: pause.status,
+          Observatii: activitate.observatii || '',
+        }
+      })
+
+    if (rows.length === 0) {
+      toast.info('Nu exista tratamente pentru export.')
+      return
+    }
+
+    const headers = [
+      'Data aplicare',
+      'Parcela',
+      'Tip activitate',
+      'Produs',
+      'Doza',
+      'Timp pauza (zile)',
+      'Data recoltare permisa',
+      'Status pauza',
+      'Observatii',
+    ]
+
+    const csvLines = [headers.join(',')]
+    rows.forEach((row) => {
+      csvLines.push(
+        [
+          row.DataAplicare,
+          row.Parcela,
+          row.TipActivitate,
+          row.Produs,
+          row.Doza,
+          row.TimpPauzaZile,
+          row.DataRecoltarePermisa,
+          row.StatusPauza,
+          row.Observatii,
+        ]
+          .map((cell) => `"${String(cell).replaceAll('"', '""')}"`)
+          .join(',')
+      )
+    })
+
+    downloadFile(
+      `tratamente-parcele-${toInputDate(today)}.csv`,
+      `\uFEFF${csvLines.join('\n')}`,
+      'text/csv;charset=utf-8;'
+    )
+    trackEvent('export_raport', {
+      format: 'tratamente_csv',
+      reportType: 'tratamente_parcele',
+      rows: rows.length,
+    })
+    toast.success('Export tratamente generat.')
+  }
+
   return (
     <AppShell
       header={
@@ -721,6 +814,10 @@ export function RapoartePageClient({
                   <Link href="/planuri">Export sezon complet (Pro+)</Link>
                 </Button>
               )}
+              <Button type="button" variant="outline" className="agri-control h-11" onClick={exportTratamenteCsv}>
+                <Download className="mr-1 h-4 w-4" />
+                Export tratamente
+              </Button>
             </div>
           </div>
 

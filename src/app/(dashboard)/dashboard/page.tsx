@@ -18,7 +18,6 @@ import { KpiCard, KpiCardSkeleton } from '@/components/app/KpiCard'
 import { LoadingState } from '@/components/app/LoadingState'
 import { PageHeader } from '@/components/app/PageHeader'
 import { ProfitSummaryCard } from '@/components/app/ProfitSummaryCard'
-import { QuickActionsPanel } from '@/components/app/QuickActionsPanel'
 import { generateSmartAlerts } from '@/lib/alerts/engine'
 import { getActivitatiAgricole } from '@/lib/supabase/queries/activitati-agricole'
 import { getCheltuieli } from '@/lib/supabase/queries/cheltuieli'
@@ -157,6 +156,33 @@ export default function DashboardPage() {
         {hasError ? <ErrorState title="Eroare dashboard" message={errorMessage ?? 'Nu am putut incarca datele.'} /> : null}
         {isLoading ? <LoadingState label="Se incarca metricile..." /> : null}
 
+        {!isLoading ? (
+          <FeatureGate
+            feature="smart_alerts"
+            title="Smart Alerts este disponibil in Pro+"
+            message="Activeaza Pro pentru alerta automata la riscuri operationale."
+          >
+            <section className="agri-card space-y-3 p-4 sm:p-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-[var(--agri-text)]">Smart Alerts</h3>
+                <span className="rounded-full bg-[var(--agri-surface-muted)] px-2 py-1 text-xs font-semibold text-[var(--agri-text-muted)]">
+                  {alerts.length}
+                </span>
+              </div>
+
+              {alerts.length === 0 ? (
+                <p className="text-sm font-medium text-[var(--agri-text-muted)]">Nu exista alerte active.</p>
+              ) : (
+                <div className="space-y-2">
+                  {alerts.map((alert) => (
+                    <AlertCard key={alert.id} alert={alert} />
+                  ))}
+                </div>
+              )}
+            </section>
+          </FeatureGate>
+        ) : null}
+
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {isLoading
             ? Array.from({ length: 6 }).map((_, index) => <KpiCardSkeleton key={index} />)
@@ -217,34 +243,6 @@ export default function DashboardPage() {
           />
         ) : null}
 
-        {!isLoading ? (
-          <FeatureGate
-            feature="smart_alerts"
-            title="Smart Alerts este disponibil in Pro+"
-            message="Activeaza Pro pentru alerta automata la riscuri operationale."
-          >
-            <section className="agri-card space-y-3 p-4 sm:p-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-[var(--agri-text)]">Smart Alerts</h3>
-                <span className="rounded-full bg-[var(--agri-surface-muted)] px-2 py-1 text-xs font-semibold text-[var(--agri-text-muted)]">
-                  {alerts.length}
-                </span>
-              </div>
-
-              {alerts.length === 0 ? (
-                <p className="text-sm font-medium text-[var(--agri-text-muted)]">Nu exista alerte active.</p>
-              ) : (
-                <div className="space-y-2">
-                  {alerts.map((alert) => (
-                    <AlertCard key={alert.id} alert={alert} />
-                  ))}
-                </div>
-              )}
-            </section>
-          </FeatureGate>
-        ) : null}
-
-        <QuickActionsPanel />
       </div>
     </AppShell>
   )

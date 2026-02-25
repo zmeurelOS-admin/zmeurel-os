@@ -16,7 +16,7 @@ export function AppShell({
   bottomInset = 'var(--app-nav-clearance)',
 }: AppShellProps) {
   return (
-    <div className="fixed inset-0 flex h-[100dvh] min-h-[100svh] flex-col overflow-hidden bg-[var(--agri-bg)] lg:static lg:h-full lg:min-h-full">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--agri-bg)]">
       <div className="relative z-20 shrink-0">{header}</div>
 
       <main

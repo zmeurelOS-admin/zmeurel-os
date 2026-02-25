@@ -57,6 +57,27 @@ export interface UpdateActivitateAgricolaInput {
   observatii?: string
 }
 
+type SupabaseLikeError = {
+  message?: string
+  code?: string
+  details?: string
+  hint?: string
+  status?: number
+}
+
+const isMissingColumnError = (error: SupabaseLikeError, column: string) =>
+  error?.code === 'PGRST204' || error?.message?.includes(`'${column}'`)
+
+const toError = (error: SupabaseLikeError): Error & SupabaseLikeError => {
+  const message = error?.message || error?.details || 'Eroare necunoscuta la salvare activitate'
+  return Object.assign(new Error(message), {
+    code: error?.code,
+    details: error?.details,
+    hint: error?.hint,
+    status: error?.status,
+  })
+}
+
 async function generateNextId(): Promise<string> {
   const supabase = createClient()
 
@@ -110,32 +131,75 @@ export async function createActivitateAgricola(
     data: { user },
   } = await supabase.auth.getUser()
 
+  const fullPayload = {
+    client_sync_id: input.client_sync_id ?? crypto.randomUUID(),
+    id_activitate: nextId,
+    data_aplicare: input.data_aplicare,
+    parcela_id: input.parcela_id ?? null,
+    tip_activitate: input.tip_activitate ?? null,
+    produs_utilizat: input.produs_utilizat ?? null,
+    doza: input.doza ?? null,
+    timp_pauza_zile: input.timp_pauza_zile ?? 0,
+    operator: input.operator ?? null,
+    observatii: input.observatii ?? null,
+    sync_status: input.sync_status ?? 'synced',
+    created_by: user?.id ?? null,
+    updated_by: user?.id ?? null,
+  }
+
   const { data, error } = await supabase
     .from('activitati_agricole')
-    .upsert(
-      {
-        client_sync_id: input.client_sync_id ?? crypto.randomUUID(),
-        id_activitate: nextId,
-        data_aplicare: input.data_aplicare,
-        parcela_id: input.parcela_id ?? null,
-        tip_activitate: input.tip_activitate ?? null,
-        produs_utilizat: input.produs_utilizat ?? null,
-        doza: input.doza ?? null,
-        timp_pauza_zile: input.timp_pauza_zile ?? 0,
-        operator: input.operator ?? null,
-        observatii: input.observatii ?? null,
-        sync_status: input.sync_status ?? 'synced',
-        created_by: user?.id ?? null,
-        updated_by: user?.id ?? null,
-      },
-      { onConflict: 'client_sync_id' }
-    )
+    .upsert(fullPayload, { onConflict: 'client_sync_id' })
     .select()
     .single()
 
   if (error) {
-    console.error('Error creating activitate:', error)
-    throw error
+    const maybeError = error as SupabaseLikeError
+    const missingSyncColumns =
+      isMissingColumnError(maybeError, 'client_sync_id') ||
+      isMissingColumnError(maybeError, 'sync_status') ||
+      isMissingColumnError(maybeError, 'created_by') ||
+      isMissingColumnError(maybeError, 'updated_by')
+
+    if (missingSyncColumns) {
+      // Fallback for environments where idempotency/audit migrations are not applied yet.
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('activitati_agricole')
+        .insert({
+          id_activitate: nextId,
+          data_aplicare: input.data_aplicare,
+          parcela_id: input.parcela_id ?? null,
+          tip_activitate: input.tip_activitate ?? null,
+          produs_utilizat: input.produs_utilizat ?? null,
+          doza: input.doza ?? null,
+          timp_pauza_zile: input.timp_pauza_zile ?? 0,
+          operator: input.operator ?? null,
+          observatii: input.observatii ?? null,
+        })
+        .select()
+        .single()
+
+      if (fallbackError) {
+        console.error('Error creating activitate (fallback):', {
+          message: fallbackError.message,
+          code: fallbackError.code,
+          details: fallbackError.details,
+          hint: fallbackError.hint,
+        })
+        throw toError(fallbackError)
+      }
+
+      return fallbackData as ActivitateAgricola
+    }
+
+    console.error('Error creating activitate:', {
+      message: maybeError?.message,
+      code: maybeError?.code,
+      details: maybeError?.details,
+      hint: maybeError?.hint,
+      status: maybeError?.status,
+    })
+    throw toError(maybeError)
   }
 
   return data

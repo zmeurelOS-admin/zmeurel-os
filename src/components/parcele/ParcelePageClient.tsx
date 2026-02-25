@@ -19,6 +19,7 @@ import { AddParcelDrawer } from '@/components/parcele/AddParcelDrawer'
 import { EditParcelDialog } from '@/components/parcele/EditParcelDialog'
 import { ParceleList } from '@/components/parcele/ParceleList'
 import { calculateProfit } from '@/lib/calculations/profit'
+import { getActivitatiAgricole } from '@/lib/supabase/queries/activitati-agricole'
 import { getCheltuieli } from '@/lib/supabase/queries/cheltuieli'
 import { getRecoltari } from '@/lib/supabase/queries/recoltari'
 import { getVanzari } from '@/lib/supabase/queries/vanzari'
@@ -64,6 +65,11 @@ export function ParcelePageClient({ initialParcele, initialError }: ParcelePageC
   const { data: cheltuieli = [] } = useQuery({
     queryKey: ['parcele', 'cheltuieli'],
     queryFn: getCheltuieli,
+  })
+
+  const { data: activitati = [] } = useQuery({
+    queryKey: ['parcele', 'activitati'],
+    queryFn: getActivitatiAgricole,
   })
 
   const deleteMutation = useMutation({
@@ -157,6 +163,41 @@ export function ParcelePageClient({ initialParcele, initialError }: ParcelePageC
     0
   )
   const totalCost = cheltuieli.reduce((sum, row) => sum + Number(row.suma_lei || 0), 0)
+  const parcelaPauseMap = (() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const map: Record<string, { remainingDays: number; product?: string | null }> = {}
+
+    activitati.forEach((activitate) => {
+      if (!activitate.parcela_id) return
+
+      const pauseDays = Number(activitate.timp_pauza_zile || 0)
+      if (pauseDays <= 0) return
+
+      const appliedAt = new Date(activitate.data_aplicare)
+      if (Number.isNaN(appliedAt.getTime())) return
+
+      const harvestAllowedAt = new Date(appliedAt)
+      harvestAllowedAt.setDate(harvestAllowedAt.getDate() + pauseDays)
+      harvestAllowedAt.setHours(0, 0, 0, 0)
+
+      const diffMs = harvestAllowedAt.getTime() - today.getTime()
+      const remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+
+      if (remainingDays <= 0) return
+
+      const current = map[activitate.parcela_id]
+      if (!current || remainingDays > current.remainingDays) {
+        map[activitate.parcela_id] = {
+          remainingDays,
+          product: activitate.produs_utilizat,
+        }
+      }
+    })
+
+    return map
+  })()
 
   return (
     <AppShell
@@ -202,6 +243,7 @@ export function ParcelePageClient({ initialParcele, initialError }: ParcelePageC
             <ParceleList
               parcele={parcele}
               parcelProfitMap={parcelProfitMap}
+              parcelPauseMap={parcelaPauseMap}
               onEdit={(parcela) => {
                 setSelectedParcela(parcela)
                 setEditOpen(true)

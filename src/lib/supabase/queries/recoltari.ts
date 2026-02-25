@@ -4,6 +4,8 @@ import type { Tables, TablesInsert, TablesUpdate } from '@/types/supabase'
 export type Recoltare = Tables<'recoltari'>
 
 export interface CreateRecoltareInput {
+  client_sync_id?: string
+  sync_status?: string
   data: string
   parcela_id: string
   culegator_id: string
@@ -61,14 +63,16 @@ export async function createRecoltare(input: CreateRecoltareInput): Promise<Reco
   const supabase = createClient()
   const nextId = await generateNextId()
 
-  const payload: RecoltareInsert = {
+  const payload = {
+    client_sync_id: input.client_sync_id ?? crypto.randomUUID(),
+    sync_status: input.sync_status ?? 'synced',
     id_recoltare: nextId,
     data: input.data,
     parcela_id: input.parcela_id,
     culegator_id: input.culegator_id,
     cantitate_kg: input.cantitate_kg,
     observatii: input.observatii ?? null,
-  }
+  } as RecoltareInsert
 
   const { data, error } = await supabase
     .from('recoltari')

@@ -1,207 +1,128 @@
-// src/components/clienti/AddClientDialog.tsx
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Loader2 } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import * as z from 'zod'
 
-// ========================================
-// ZOD VALIDATION SCHEMA
-// ========================================
+import { AppDrawer } from '@/components/app/AppDrawer'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
-const clientSchema = z.object({
-  nume_client: z.string().min(2, 'Numele trebuie să aibă minim 2 caractere'),
+const schema = z.object({
+  nume_client: z.string().trim().min(2, 'Numele trebuie sa aiba minim 2 caractere'),
   telefon: z.string().optional(),
   email: z.string().email('Email invalid').or(z.literal('')).optional(),
   adresa: z.string().optional(),
   pret_negociat_lei_kg: z.string().optional(),
   observatii: z.string().optional(),
-});
+})
 
-type ClientFormData = z.infer<typeof clientSchema>;
-
-// ========================================
-// COMPONENT
-// ========================================
+type ClientFormData = z.infer<typeof schema>
 
 interface AddClientDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (data: ClientFormData) => Promise<void>;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (data: ClientFormData) => Promise<void>
 }
 
-export function AddClientDialog({
-  open,
-  onOpenChange,
-  onSubmit,
-}: AddClientDialogProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const defaults = (): ClientFormData => ({
+  nume_client: '',
+  telefon: '',
+  email: '',
+  adresa: '',
+  pret_negociat_lei_kg: '',
+  observatii: '',
+})
+
+export function AddClientDialog({ open, onOpenChange, onSubmit }: AddClientDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<ClientFormData>({
-    resolver: zodResolver(clientSchema),
-    defaultValues: {
-      nume_client: '',
-      telefon: '',
-      email: '',
-      adresa: '',
-      pret_negociat_lei_kg: '',
-      observatii: '',
-    },
-  });
+    resolver: zodResolver(schema),
+    defaultValues: defaults(),
+  })
+
+  useEffect(() => {
+    if (!open) form.reset(defaults())
+  }, [open, form])
 
   const handleSubmit = async (data: ClientFormData) => {
-    setIsSubmitting(true);
+    setIsSubmitting(true)
     try {
-      await onSubmit(data);
-      form.reset();
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Error creating client:', JSON.stringify(error, null, 2));
+      await onSubmit(data)
+      onOpenChange(false)
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="sm:max-w-[500px] max-h-[75vh] overflow-y-auto"
-        style={{ backgroundColor: 'white' }}
-      >
-        <DialogHeader>
-          <DialogTitle>Adaugă Client Nou</DialogTitle>
-        </DialogHeader>
+    <AppDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Adauga client nou"
+      footer={
+        <div className="grid grid-cols-2 gap-3">
+          <Button type="button" variant="outline" className="agri-cta" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            Anuleaza
+          </Button>
+          <Button
+            type="button"
+            className="agri-cta bg-[var(--agri-primary)] text-white hover:bg-emerald-700"
+            onClick={form.handleSubmit(handleSubmit)}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salveaza'}
+          </Button>
+        </div>
+      }
+    >
+      <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
+        <div className="space-y-2">
+          <Label htmlFor="client_nume">Nume client</Label>
+          <Input id="client_nume" className="agri-control h-12" placeholder="Restaurant La Zmeura" {...form.register('nume_client')} />
+          {form.formState.errors.nume_client ? <p className="text-xs text-red-600">{form.formState.errors.nume_client.message}</p> : null}
+        </div>
 
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
-          {/* Nume Client */}
-          <div className="space-y-1">
-            <Label htmlFor="nume_client" className="text-sm">
-              Nume Client <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="nume_client"
-              {...form.register('nume_client')}
-              placeholder="Ex: Restaurant La Zmeură"
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-            {form.formState.errors.nume_client && (
-              <p className="text-xs text-red-500">
-                {form.formState.errors.nume_client.message}
-              </p>
-            )}
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="client_telefon">Telefon</Label>
+          <Input id="client_telefon" type="tel" className="agri-control h-12" placeholder="0740123456" {...form.register('telefon')} />
+        </div>
 
-          {/* Telefon */}
-          <div className="space-y-1">
-            <Label htmlFor="telefon" className="text-sm">Telefon</Label>
-            <Input
-              id="telefon"
-              {...form.register('telefon')}
-              placeholder="Ex: 0740123456"
-              type="tel"
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="client_email">Email</Label>
+          <Input id="client_email" type="email" className="agri-control h-12" placeholder="contact@client.ro" {...form.register('email')} />
+          {form.formState.errors.email ? <p className="text-xs text-red-600">{form.formState.errors.email.message}</p> : null}
+        </div>
 
-          {/* Email */}
-          <div className="space-y-1">
-            <Label htmlFor="email" className="text-sm">Email</Label>
-            <Input
-              id="email"
-              {...form.register('email')}
-              placeholder="Ex: contact@restaurant.ro"
-              type="email"
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-            {form.formState.errors.email && (
-              <p className="text-xs text-red-500">
-                {form.formState.errors.email.message}
-              </p>
-            )}
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="client_adresa">Adresa</Label>
+          <Textarea id="client_adresa" rows={3} className="agri-control w-full px-3 py-2 text-base" {...form.register('adresa')} />
+        </div>
 
-          {/* Adresă */}
-          <div className="space-y-1">
-            <Label htmlFor="adresa" className="text-sm">Adresă</Label>
-            <Textarea
-              id="adresa"
-              {...form.register('adresa')}
-              placeholder="Ex: Str. Principală nr. 10, Suceava"
-              rows={2}
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="client_pret">Pret negociat (lei/kg)</Label>
+          <Input
+            id="client_pret"
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            className="agri-control h-12"
+            placeholder="12.50"
+            {...form.register('pret_negociat_lei_kg')}
+          />
+        </div>
 
-          {/* Preț Negociat */}
-          <div className="space-y-1">
-            <Label htmlFor="pret_negociat_lei_kg" className="text-sm">
-              Preț Negociat (lei/kg)
-            </Label>
-            <Input
-              id="pret_negociat_lei_kg"
-              {...form.register('pret_negociat_lei_kg')}
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="Ex: 12.50"
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-            <p className="text-xs text-gray-500">
-              Lasă gol pentru preț standard
-            </p>
-          </div>
-
-          {/* Observații */}
-          <div className="space-y-1">
-            <Label htmlFor="observatii" className="text-sm">Observații</Label>
-            <Textarea
-              id="observatii"
-              {...form.register('observatii')}
-              placeholder="Ex: Are 15 lădițe returnabile"
-              rows={2}
-              style={{ backgroundColor: 'white', color: 'black' }}
-            />
-          </div>
-
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              Anulează
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              style={{ backgroundColor: '#F16B6B', color: 'white' }}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Se salvează...
-                </>
-              ) : (
-                'Salvează Client'
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+        <div className="space-y-2">
+          <Label htmlFor="client_obs">Observatii</Label>
+          <Textarea id="client_obs" rows={4} className="agri-control w-full px-3 py-2 text-base" {...form.register('observatii')} />
+        </div>
+      </form>
+    </AppDrawer>
+  )
 }

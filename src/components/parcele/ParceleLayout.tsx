@@ -11,6 +11,7 @@ import { EditParcelDialog } from '@/components/parcele/EditParcelDialog'
 import { Fab } from '@/components/parcele/Fab'
 import { ParcelaCard } from '@/components/parcele/ParcelaCard'
 import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog'
+import { CompactPageHeader } from '@/components/layout/CompactPageHeader'
 
 interface ParceleLayoutProps {
   initialParcele: Parcela[]
@@ -56,21 +57,13 @@ export function ParceleLayout({ initialParcele }: ParceleLayoutProps) {
 
   return (
     <div className="fixed inset-0 flex h-[100dvh] min-h-[100svh] flex-col overflow-hidden bg-slate-50 lg:static lg:h-full lg:min-h-full">
-      <div className="absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-emerald-700 to-emerald-600" />
+      <CompactPageHeader
+        title="Parcele"
+        subtitle="Administrare terenuri cultivate"
+        rightSlot={<Map className="h-5 w-5" />}
+      />
 
-      <header className="relative z-20 shrink-0 px-5 pt-[calc(var(--safe-t)+12px)] pb-4">
-        <div className="mx-auto flex w-full max-w-3xl items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-white">Parcele</h1>
-            <p className="mt-1 text-sm text-emerald-100">Administrare terenuri cultivate</p>
-          </div>
-          <div className="rounded-xl bg-white/20 p-3 text-white shadow-sm">
-            <Map className="h-5 w-5" />
-          </div>
-        </div>
-      </header>
-
-      <main className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[calc(var(--safe-b)+24px)]">
+      <main className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(var(--safe-b)+24px)]">
         <div className="mx-auto w-full max-w-3xl space-y-4 py-4">
           {isLoading && <p className="text-center text-sm text-slate-600">Se incarca...</p>}
 

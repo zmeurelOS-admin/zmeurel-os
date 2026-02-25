@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { UserCheck } from 'lucide-react'
+import { Search, ShoppingCart, UserCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { AppShell } from '@/components/app/AppShell'
@@ -14,12 +14,16 @@ import { LoadingState } from '@/components/app/LoadingState'
 import { PageHeader } from '@/components/app/PageHeader'
 import { StickyActionBar } from '@/components/app/StickyActionBar'
 import { AddClientDialog } from '@/components/clienti/AddClientDialog'
+import { ClientCard } from '@/components/clienti/ClientCard'
+import { EditClientDialog } from '@/components/clienti/EditClientDialog'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { AddVanzareDialog } from '@/components/vanzari/AddVanzareDialog'
 import {
   createClienti,
   deleteClienti,
   getClienti,
+  updateClienti,
   type Client,
 } from '@/lib/supabase/queries/clienti'
 
@@ -29,7 +33,11 @@ interface ClientPageClientProps {
 
 export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
   const queryClient = useQueryClient()
+  const [searchTerm, setSearchTerm] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [addOrderOpen, setAddOrderOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [deletingClient, setDeletingClient] = useState<Client | null>(null)
   const pendingDeleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const pendingDeletedItems = useRef<Record<string, Client>>({})
@@ -51,6 +59,20 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
       queryClient.invalidateQueries({ queryKey: ['clienti'] })
       toast.success('Client adaugat cu succes')
       setDialogOpen(false)
+    },
+    onError: (err: Error) => {
+      toast.error(err.message)
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Parameters<typeof updateClienti>[1] }) =>
+      updateClienti(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clienti'] })
+      toast.success('Client actualizat')
+      setEditOpen(false)
+      setEditingClient(null)
     },
     onError: (err: Error) => {
       toast.error(err.message)
@@ -112,6 +134,17 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
     queryClient.invalidateQueries({ queryKey: ['clienti'] })
   }
 
+  const filteredClienti = useMemo(() => {
+    if (!searchTerm.trim()) return clienti
+
+    const term = searchTerm.toLowerCase().trim()
+    return clienti.filter((client) =>
+      [client.nume_client, client.telefon, client.email, client.adresa, client.observatii]
+        .filter(Boolean)
+        .some((value) => value?.toLowerCase().includes(term))
+    )
+  }, [clienti, searchTerm])
+
   return (
     <AppShell
       header={<PageHeader title="Clienti" subtitle="Administrare clienti si preturi negociate" rightSlot={<UserCheck className="h-5 w-5" />} />}
@@ -125,10 +158,31 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
       }
     >
       <div className="mx-auto w-full max-w-4xl space-y-4 py-4">
+        <div className="flex items-center gap-2">
+          <Input
+            className="agri-control h-12"
+            placeholder="Cauta client dupa nume, telefon sau email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <Button type="button" variant="outline" className="h-12 w-12 shrink-0 p-0" aria-label="Cauta clienti">
+            <Search className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Button
+          type="button"
+          className="agri-cta w-full bg-[var(--agri-primary)] text-white hover:bg-emerald-700"
+          onClick={() => setAddOrderOpen(true)}
+        >
+          <ShoppingCart className="h-4 w-4" />
+          Comanda noua
+        </Button>
+
         {isError ? <ErrorState title="Eroare la incarcare" message={(error as Error).message} onRetry={refresh} /> : null}
         {isLoading ? <LoadingState label="Se incarca clientii..." /> : null}
 
-        {!isLoading && !isError && clienti.length === 0 ? (
+        {!isLoading && !isError && filteredClienti.length === 0 ? (
           <EmptyState
             title="Niciun client"
             description="Adauga primul client folosind actiunea principala."
@@ -136,27 +190,21 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
           />
         ) : null}
 
-        {!isLoading && !isError && clienti.length > 0 ? (
+        {!isLoading && !isError && filteredClienti.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {clienti.map((client) => (
-              <Card key={client.id} className="agri-card">
-                <CardContent className="space-y-2 p-4">
-                  <h3 className="text-lg font-semibold text-[var(--agri-text)]">{client.nume_client}</h3>
-                  {client.telefon ? <p className="text-sm text-[var(--agri-text-muted)]">{client.telefon}</p> : null}
-                  {client.email ? <p className="text-sm text-[var(--agri-text-muted)]">{client.email}</p> : null}
-                  {client.pret_negociat_lei_kg ? (
-                    <p className="text-sm text-[var(--agri-text-muted)]">Pret negociat: {client.pret_negociat_lei_kg} lei/kg</p>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="agri-control h-11 w-full border-red-200 text-red-700"
-                    onClick={() => setDeletingClient(client)}
-                  >
-                    Sterge
-                  </Button>
-                </CardContent>
-              </Card>
+            {filteredClienti.map((client) => (
+              <ClientCard
+                key={client.id}
+                client={client}
+                onEdit={(item) => {
+                  setEditingClient(item)
+                  setEditOpen(true)
+                }}
+                onDelete={(id) => {
+                  const target = clienti.find((item) => item.id === id) ?? null
+                  setDeletingClient(target)
+                }}
+              />
             ))}
           </div>
         ) : null}
@@ -168,9 +216,35 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
         onSubmit={async (data) => {
           await createMutation.mutateAsync({
             nume_client: data.nume_client,
-            telefon: data.telefon,
-            email: data.email,
-            adresa: data.adresa,
+            telefon: data.telefon || null,
+            email: data.email || null,
+            adresa: data.adresa || null,
+            pret_negociat_lei_kg: data.pret_negociat_lei_kg ? Number(data.pret_negociat_lei_kg) : null,
+            observatii: data.observatii || null,
+          })
+        }}
+      />
+
+      <AddVanzareDialog open={addOrderOpen} onOpenChange={setAddOrderOpen} hideTrigger />
+
+      <EditClientDialog
+        client={editingClient}
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open)
+          if (!open) setEditingClient(null)
+        }}
+        onSubmit={async (id, data) => {
+          await updateMutation.mutateAsync({
+            id,
+            payload: {
+              nume_client: data.nume_client,
+              telefon: data.telefon || null,
+              email: data.email || null,
+              adresa: data.adresa || null,
+              pret_negociat_lei_kg: data.pret_negociat_lei_kg ? Number(data.pret_negociat_lei_kg) : null,
+              observatii: data.observatii || null,
+            },
           })
         }}
       />

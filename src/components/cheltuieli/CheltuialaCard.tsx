@@ -1,108 +1,45 @@
-'use client';
+'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Pencil, Trash2, Calendar, Coins, ShoppingCart, FileText } from 'lucide-react';
-import type { Cheltuiala } from '@/lib/supabase/queries/cheltuieli';
+import { CompactListCard } from '@/components/app/CompactListCard'
+import type { Cheltuiala } from '@/lib/supabase/queries/cheltuieli'
 
 interface CheltuialaCardProps {
-  cheltuiala: Cheltuiala;
-  onEdit: (cheltuiala: Cheltuiala) => void;
-  onDelete: (id: string, name: string) => void;
+  cheltuiala: Cheltuiala
+  onEdit: (cheltuiala: Cheltuiala) => void
+  onDelete: (id: string, name: string) => void
+}
+
+const getCategorieTone = (categorie: string) => {
+  const colorMap: Record<string, string> = {
+    Electricitate: 'bg-yellow-100 text-yellow-800',
+    'Motorină Transport': 'bg-red-100 text-red-800',
+    Ambalaje: 'bg-blue-100 text-blue-800',
+    Fertilizare: 'bg-green-100 text-green-800',
+    Pesticide: 'bg-orange-100 text-orange-800',
+    Cules: 'bg-purple-100 text-purple-800',
+    'Material Săditor': 'bg-pink-100 text-pink-800',
+  }
+  return colorMap[categorie] || 'bg-slate-100 text-slate-800'
 }
 
 export function CheltuialaCard({ cheltuiala, onEdit, onDelete }: CheltuialaCardProps) {
-  const dataFormatted = new Date(cheltuiala.data).toLocaleDateString('ro-RO', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  const getCategorieColor = (categorie: string) => {
-    const colorMap: Record<string, string> = {
-      'Electricitate': 'bg-yellow-100 text-yellow-800',
-      'Motorină Transport': 'bg-red-100 text-red-800',
-      'Ambalaje': 'bg-blue-100 text-blue-800',
-      'Fertilizare': 'bg-green-100 text-green-800',
-      'Pesticide': 'bg-orange-100 text-orange-800',
-      'Cules': 'bg-purple-100 text-purple-800',
-      'Material Săditor': 'bg-pink-100 text-pink-800',
-    };
-    return colorMap[categorie] || 'bg-gray-100 text-gray-800';
-  };
+  const categorie = cheltuiala.categorie || 'Altele'
+  const subtitle = `${new Date(cheltuiala.data).toLocaleDateString('ro-RO')} · ${categorie}`
+  const metadata = cheltuiala.furnizor || cheltuiala.descriere || undefined
 
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <CardTitle className="text-lg font-semibold">
-                {cheltuiala.suma_lei} lei
-              </CardTitle>
-              <Badge className={getCategorieColor(cheltuiala.categorie || "Altele")}>
-                {cheltuiala.categorie || "Altele"}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2 text-sm">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <span>{dataFormatted}</span>
-        </div>
-
-        {cheltuiala.furnizor && (
-          <div className="flex items-center gap-2 text-sm">
-            <ShoppingCart className="w-4 h-4 text-muted-foreground" />
-            <span>{cheltuiala.furnizor}</span>
-          </div>
-        )}
-
-        {cheltuiala.descriere && (
-          <div className="flex items-start gap-2 text-sm">
-            <FileText className="w-4 h-4 text-muted-foreground mt-0.5" />
-            <span className="text-muted-foreground text-xs line-clamp-2">
-              {cheltuiala.descriere}
-            </span>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 text-sm pt-2 border-t">
-          <Coins className="w-4 h-4 text-muted-foreground" />
-          <span className="font-semibold text-lg" style={{ color: '#ef4444' }}>
-            -{cheltuiala.suma_lei} lei
-          </span>
-        </div>
-
-        <div className="flex gap-2 pt-3 border-t">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={() => onEdit(cheltuiala)}
-          >
-            <Pencil className="w-4 h-4 mr-2" />
-            Editează
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            style={{ color: '#ef4444', borderColor: '#ef4444' }}
-            onClick={() =>
-              onDelete(
-                cheltuiala.id,
-                `${cheltuiala.categorie || "Altele"} - ${cheltuiala.suma_lei} lei`
-              )
-            }
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+    <CompactListCard
+      title={`-${Number(cheltuiala.suma_lei).toFixed(2)} lei`}
+      subtitle={subtitle}
+      metadata={metadata}
+      status={
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${getCategorieTone(categorie)}`}>
+          {categorie}
+        </span>
+      }
+      trailingMeta={cheltuiala.sync_status || undefined}
+      onEdit={() => onEdit(cheltuiala)}
+      onDelete={() => onDelete(cheltuiala.id, `${categorie} - ${cheltuiala.suma_lei} lei`)}
+    />
+  )
 }

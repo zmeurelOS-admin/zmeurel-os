@@ -4,7 +4,7 @@ import { RapoartePageClient } from './RapoartePageClient'
 export default async function RapoartePage() {
   const supabase = await createClient()
 
-  const [{ data: recoltari = [] }, { data: vanzari = [] }, { data: cheltuieli = [] }, { data: parcele = [] }, { data: culegatori = [] }, { data: clienti = [] }] =
+  const [{ data: recoltari = [] }, { data: vanzari = [] }, { data: cheltuieli = [] }, { data: parcele = [] }, { data: culegatori = [] }, { data: clienti = [] }, { data: activitati = [] }] =
     await Promise.all([
       supabase
         .from('recoltari')
@@ -27,6 +27,10 @@ export default async function RapoartePage() {
       supabase
         .from('clienti')
         .select('id,id_client,nume_client'),
+      supabase
+        .from('activitati_agricole')
+        .select('id,data_aplicare,parcela_id,tip_activitate,produs_utilizat,doza,timp_pauza_zile,observatii')
+        .order('data_aplicare', { ascending: false }),
     ])
 
   return (
@@ -37,6 +41,7 @@ export default async function RapoartePage() {
       initialParcele={parcele ?? []}
       initialCulegatori={culegatori ?? []}
       initialClienti={clienti ?? []}
+      initialActivitati={activitati ?? []}
     />
   )
 }

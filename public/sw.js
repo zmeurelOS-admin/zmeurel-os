@@ -2,7 +2,7 @@ const CACHE_VERSION = 'zmeurel-v1'
 const SHELL_CACHE = `${CACHE_VERSION}-shell`
 const ASSET_CACHE = `${CACHE_VERSION}-assets`
 
-const SHELL_URLS = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-icon.png']
+const SHELL_URLS = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/apple-icon.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
