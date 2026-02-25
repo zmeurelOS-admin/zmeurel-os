@@ -1,82 +1,106 @@
-'use client'
+﻿'use client'
 
-import { useEffect, useState, type CSSProperties } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { X } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import * as z from 'zod'
+
+import { AppDialog } from '@/components/app/AppDialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { getParcele } from '@/lib/supabase/queries/parcele'
 import {
   type ActivitateAgricola,
   updateActivitateAgricola,
 } from '@/lib/supabase/queries/activitati-agricole'
 
-const supabase = createClient()
+const schema = z.object({
+  data_aplicare: z.string().min(1, 'Data este obligatorie'),
+  parcela_id: z.string().optional(),
+  tip_activitate: z.string().min(1, 'Tipul activitatii este obligatoriu'),
+  produs_utilizat: z.string().optional(),
+  doza: z.string().optional(),
+  timp_pauza_zile: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => !value || (Number.isFinite(Number(value)) && Number(value) >= 0), {
+      message: 'Timpul de pauza trebuie sa fie un numar valid',
+    }),
+  observatii: z.string().optional(),
+})
+
+type FormValues = z.infer<typeof schema>
+
+interface EditActivitateAgricolaDialogProps {
+  activitate: ActivitateAgricola | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+const defaults = (): FormValues => ({
+  data_aplicare: new Date().toISOString().split('T')[0],
+  parcela_id: '',
+  tip_activitate: '',
+  produs_utilizat: '',
+  doza: '',
+  timp_pauza_zile: '0',
+  observatii: '',
+})
 
 export function EditActivitateAgricolaDialog({
   activitate,
   open,
   onOpenChange,
-}: {
-  activitate: ActivitateAgricola | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}) {
+}: EditActivitateAgricolaDialogProps) {
   const queryClient = useQueryClient()
 
-  const [parcele, setParcele] = useState<any[]>([])
-
-  const [dataAplicare, setDataAplicare] = useState('')
-  const [parcelaId, setParcelaId] = useState('')
-  const [tipActivitate, setTipActivitate] = useState('')
-  const [produs, setProdus] = useState('')
-  const [doza, setDoza] = useState('')
-  const [timpPauza, setTimpPauza] = useState(0)
-  const [observatii, setObservatii] = useState('')
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: defaults(),
+  })
 
   useEffect(() => {
     if (!open || !activitate) return
 
-    setDataAplicare(
-      activitate.data_aplicare
+    form.reset({
+      data_aplicare: activitate.data_aplicare
         ? new Date(activitate.data_aplicare).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0]
-    )
-    setParcelaId(activitate.parcela_id ?? '')
-    setTipActivitate(activitate.tip_activitate ?? '')
-    setProdus(activitate.produs_utilizat ?? '')
-    setDoza(activitate.doza ?? '')
-    setTimpPauza(
-      typeof activitate.timp_pauza_zile === 'number'
-        ? activitate.timp_pauza_zile
-        : 0
-    )
-    setObservatii(activitate.observatii ?? '')
+        : new Date().toISOString().split('T')[0],
+      parcela_id: activitate.parcela_id ?? '',
+      tip_activitate: activitate.tip_activitate ?? '',
+      produs_utilizat: activitate.produs_utilizat ?? '',
+      doza: activitate.doza ?? '',
+      timp_pauza_zile:
+        typeof activitate.timp_pauza_zile === 'number' ? String(activitate.timp_pauza_zile) : '0',
+      observatii: activitate.observatii ?? '',
+    })
+  }, [open, activitate, form])
 
-    loadParcele()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, activitate?.id])
-
-  async function loadParcele() {
-    const { data } = await supabase.from('parcele').select('id, id_parcela')
-    if (data) setParcele(data)
-  }
+  const { data: parcele = [] } = useQuery({
+    queryKey: ['parcele'],
+    queryFn: getParcele,
+  })
 
   const mutation = useMutation({
-    mutationFn: (payload: {
-      id: string
-      input: {
-        data_aplicare?: string
-        parcela_id?: string
-        tip_activitate?: string
-        produs_utilizat?: string
-        doza?: string
-        timp_pauza_zile?: number
-        observatii?: string
-      }
-    }) => updateActivitateAgricola(payload.id, payload.input),
+    mutationFn: ({ id, values }: { id: string; values: FormValues }) =>
+      updateActivitateAgricola(id, {
+        data_aplicare: values.data_aplicare,
+        parcela_id: values.parcela_id || undefined,
+        tip_activitate: values.tip_activitate,
+        produs_utilizat: values.produs_utilizat?.trim() || undefined,
+        doza: values.doza?.trim() || undefined,
+        timp_pauza_zile: Number(values.timp_pauza_zile || 0),
+        observatii: values.observatii?.trim() || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activitati'] })
-      toast.success('Activitate actualizată')
+      toast.success('Activitate actualizata')
       onOpenChange(false)
     },
     onError: (error: any) => {
@@ -84,169 +108,88 @@ export function EditActivitateAgricolaDialog({
     },
   })
 
-  if (!open || !activitate) return null
+  if (!activitate) return null
 
-  const fieldStyle: CSSProperties = {
-    width: '100%',
-    height: 44,
-    borderRadius: 16,
-    border: '1px solid #e5e7eb',
-    padding: '0 12px',
-    outline: 'none',
-    background: 'white',
-    fontSize: 14,
-  }
-
-  const selectStyle: CSSProperties = {
-    ...fieldStyle,
-    appearance: 'none',
-    WebkitAppearance: 'none',
-    MozAppearance: 'none',
-    paddingRight: 36,
-  }
-
-  const textAreaStyle: CSSProperties = {
-    width: '100%',
-    borderRadius: 16,
-    border: '1px solid #e5e7eb',
-    padding: '10px 12px',
-    outline: 'none',
-    background: 'white',
-    fontSize: 14,
-    minHeight: 84,
-    resize: 'vertical',
+  const submit = (values: FormValues) => {
+    if (mutation.isPending) return
+    mutation.mutate({ id: activitate.id, values })
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.4)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-      }}
+    <AppDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Editeaza activitate agricola"
+      footer={
+        <div className="grid grid-cols-2 gap-3">
+          <Button type="button" variant="outline" className="agri-cta" onClick={() => onOpenChange(false)}>
+            Anuleaza
+          </Button>
+          <Button
+            type="button"
+            className="agri-cta bg-[var(--agri-primary)] text-white hover:bg-emerald-700"
+            onClick={form.handleSubmit(submit)}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salveaza'}
+          </Button>
+        </div>
+      }
     >
-      <div
-        style={{
-          background: 'white',
-          width: '100%',
-          maxWidth: '420px',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          borderRadius: '24px',
-          padding: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <div>
-            <h3 style={{ fontWeight: 900 }}>Editează operațiune</h3>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>
-              {activitate.id_activitate}
-            </div>
-          </div>
-
-          <X onClick={() => onOpenChange(false)} style={{ cursor: 'pointer' }} />
+      <form className="space-y-4" onSubmit={form.handleSubmit(submit)}>
+        <div className="space-y-2">
+          <Label htmlFor="act_edit_data">Data aplicare</Label>
+          <Input id="act_edit_data" type="date" className="agri-control h-12" {...form.register('data_aplicare')} />
+          {form.formState.errors.data_aplicare ? <p className="text-xs text-red-600">{form.formState.errors.data_aplicare.message}</p> : null}
         </div>
 
-        <input
-          type="date"
-          value={dataAplicare}
-          onChange={(e) => setDataAplicare(e.target.value)}
-          style={fieldStyle}
-        />
+        <div className="space-y-2">
+          <Label htmlFor="act_edit_parcela">Parcela</Label>
+          <select id="act_edit_parcela" className="agri-control h-12 w-full px-3 text-base" {...form.register('parcela_id')}>
+            <option value="">Selecteaza parcela</option>
+            {parcele.map((parcela: any) => (
+              <option key={parcela.id} value={parcela.id}>
+                {parcela.nume_parcela || 'Parcela'}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <select
-          value={parcelaId}
-          onChange={(e) => setParcelaId(e.target.value)}
-          style={selectStyle}
-        >
-          <option value="">Selectează parcela</option>
-          {parcele.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.id_parcela}
-            </option>
-          ))}
-        </select>
+        <div className="space-y-2">
+          <Label htmlFor="act_edit_tip">Tip activitate</Label>
+          <select id="act_edit_tip" className="agri-control h-12 w-full px-3 text-base" {...form.register('tip_activitate')}>
+            <option value="">Tip operatiune</option>
+            <option value="fertilizare_foliara">Fertilizare foliara</option>
+            <option value="fertirigare">Fertirigare</option>
+            <option value="fertilizare_baza">Fertilizare de baza</option>
+            <option value="fungicide_pesticide">Fungicide/Pesticide</option>
+            <option value="irigatie">Irigatie</option>
+            <option value="altele">Altele</option>
+          </select>
+          {form.formState.errors.tip_activitate ? <p className="text-xs text-red-600">{form.formState.errors.tip_activitate.message}</p> : null}
+        </div>
 
-        <select
-          value={tipActivitate}
-          onChange={(e) => setTipActivitate(e.target.value)}
-          style={selectStyle}
-        >
-          <option value="">Tip operațiune</option>
-          <option value="fertilizare_foliara">Fertilizare foliară</option>
-          <option value="fertirigare">Fertirigare</option>
-          <option value="fertilizare_baza">Fertilizare de bază</option>
-          <option value="fungicide_pesticide">Fungicide/Pesticide</option>
-          <option value="irigatie">Irigatie</option>
-          <option value="altele">Altele</option>
-        </select>
+        <div className="space-y-2">
+          <Label htmlFor="act_edit_produs">Produs</Label>
+          <Input id="act_edit_produs" className="agri-control h-12" {...form.register('produs_utilizat')} />
+        </div>
 
-        <input
-          placeholder="Produs"
-          value={produs}
-          onChange={(e) => setProdus(e.target.value)}
-          style={fieldStyle}
-        />
+        <div className="space-y-2">
+          <Label htmlFor="act_edit_doza">Cantitate / doza</Label>
+          <Input id="act_edit_doza" className="agri-control h-12" {...form.register('doza')} />
+        </div>
 
-        <input
-          placeholder="Cantitate / doză"
-          value={doza}
-          onChange={(e) => setDoza(e.target.value)}
-          style={fieldStyle}
-        />
+        <div className="space-y-2">
+          <Label htmlFor="act_edit_pauza">Timp pauza (zile)</Label>
+          <Input id="act_edit_pauza" type="number" min="0" className="agri-control h-12" {...form.register('timp_pauza_zile')} />
+          {form.formState.errors.timp_pauza_zile ? <p className="text-xs text-red-600">{form.formState.errors.timp_pauza_zile.message}</p> : null}
+        </div>
 
-        <input
-          type="number"
-          placeholder="Timp pauză (zile)"
-          value={timpPauza}
-          onChange={(e) => setTimpPauza(Number(e.target.value))}
-          style={fieldStyle}
-        />
-
-        <textarea
-          placeholder="Observații"
-          value={observatii}
-          onChange={(e) => setObservatii(e.target.value)}
-          style={textAreaStyle}
-        />
-
-        <button
-          onClick={() =>
-            mutation.mutate({
-              id: activitate.id,
-              input: {
-                data_aplicare: dataAplicare,
-                parcela_id: parcelaId || undefined,
-                tip_activitate: tipActivitate || undefined,
-                produs_utilizat: produs || undefined,
-                doza: doza || undefined,
-                timp_pauza_zile: timpPauza,
-                observatii: observatii || undefined,
-              },
-            })
-          }
-          disabled={mutation.isPending}
-          style={{
-            padding: '16px',
-            background: '#0ea5e9',
-            border: 'none',
-            borderRadius: '16px',
-            color: 'white',
-            fontWeight: 900,
-            opacity: mutation.isPending ? 0.7 : 1,
-          }}
-        >
-          {mutation.isPending ? 'Se salvează...' : 'Salvează modificările'}
-        </button>
-      </div>
-    </div>
+        <div className="space-y-2">
+          <Label htmlFor="act_edit_obs">Observatii</Label>
+          <Textarea id="act_edit_obs" rows={4} className="agri-control w-full px-3 py-2 text-base" {...form.register('observatii')} />
+        </div>
+      </form>
+    </AppDialog>
   )
 }

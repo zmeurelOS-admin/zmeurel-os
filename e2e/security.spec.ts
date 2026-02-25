@@ -1,218 +1,385 @@
-import { test, expect, Page } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-/**
- * Security Test Suite for Zmeurel OS
- * 
- * Tests RLS-First Architecture:
- * 1. Middleware protects all routes
- * 2. React Query cache is cleared on logout
- * 3. Backend RLS enforces tenant isolation
- */
-
-// Test credentials
-const USER_A = {
-  email: 'user1@gmail.com',
-  password: 'test1234',
-};
-
-const USER_B = {
-  email: 'user2@gmail.com',
-  password: 'test1234',
-};
-
-// Helper function to login via UI
-async function loginUser(page: Page, email: string, password: string) {
-  await page.goto('/login');
-  
-  // Fill login form
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', password);
-  
-  // Submit login
-  await page.getByRole('button', { name: /submit/i }).click();
-  
-  // Wait for successful login redirect
-  await page.waitForURL(/\/(dashboard|clienti|parcele|cheltuieli|recoltari|culegatori|investitii|vanzari|activitati-agricole)/, {
-    timeout: 10000,
-  });
+type TestContext = {
+  url: string
+  anonKey: string
+  serviceRoleKey: string
+  service: SupabaseClient
+  userA: { id: string; email: string; password: string }
+  userB: { id: string; email: string; password: string }
+  tenantAId: string
+  tenantBId: string
+  recordAId: string
+  recordBId: string
 }
 
-// Helper function to get current date in ISO format (YYYY-MM-DD)
-function getTodayISO(): string {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
+const ctx: Partial<TestContext> = {}
+
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing required env var: ${name}`)
+  }
+  return value
 }
 
-test.describe('RLS-First Security Tests', () => {
-  
-  test.describe.configure({ mode: 'serial' }); // Run tests in order
-  
-  /**
-   * TEST 1: Middleware Security - Unauthenticated Access
-   * 
-   * Verifies that middleware blocks unauthenticated users from accessing
-   * protected routes and redirects them to /login.
-   */
-  test('TEST 1: Middleware blocks unauthenticated access to /cheltuieli', async ({ page }) => {
-    // Navigate directly to protected route without authentication
-    await page.goto('/cheltuieli');
-    
-    // Assert strict redirect to /login
-    await expect(page).toHaveURL('/login', { timeout: 10000 });
-    
-    // Ensure no protected UI content is rendered
-    // The page should show login form, not cheltuieli UI
-    await expect(page.locator('input[type="email"]')).toBeVisible();
-    await expect(page.locator('input[type="password"]')).toBeVisible();
-    
-    // Ensure cheltuieli-specific content is NOT visible
-    await expect(page.getByText(/cheltuiel/i).first()).not.toBeVisible();
-  });
+function uniqueToken(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
 
-  /**
-   * TEST 2: Cache Bleed & Tenant Isolation
-   * 
-   * This is the CRITICAL test that verifies:
-   * 1. React Query cache is properly cleared on logout
-   * 2. No cross-tenant data leakage in the UI
-   * 3. Users can only see their own tenant's data
-   */
-  test('TEST 2: Cache cleared on logout - no cross-tenant UI bleed', async ({ page }) => {
-    test.setTimeout(90000); // 90 seconds timeout for this complex test
-    
-    const testCategory = 'Cheltuiala_UserA_Test';
-    const todayISO = getTodayISO();
-    
-    // ============================================================
-    // STEP 1: Login as User A
-    // ============================================================
-    await loginUser(page, USER_A.email, USER_A.password);
-    console.log('✅ User A logged in');
-    
-    // ============================================================
-    // STEP 2: Navigate to /cheltuieli and create a test record
-    // ============================================================
-    await page.goto('/cheltuieli');
-    
-    // Click "Adaugă" button to open dialog
-    await page.getByRole('button', { name: /adaugă/i }).click();
-    
-    // Wait for dialog to be visible
-    await expect(page.locator('select#categorie')).toBeVisible();
-    
-    // Fill the form
-    await page.selectOption('select#categorie', 'Altele');
-    await page.fill('input#suma_lei', '1');
-    await page.fill('input#data', todayISO);
-    await page.fill('textarea#descriere', testCategory);
-    
-    // Submit the form
-    await page.getByRole('button', { name: /salvează/i }).click();
-    
-    // Verify the record is visible in User A's UI
-    await expect(page.getByText(testCategory).first()).toBeVisible({ timeout: 10000 });
-    console.log('✅ User A created test record');
-    
-    // ============================================================
-    // STEP 3: Logout User A
-    // ============================================================
-    const logoutButton = page.getByRole('button', { name: /ieșire/i });
-    await logoutButton.click();
-    await page.waitForURL('**/login', { timeout: 15000 });
-    console.log('✅ User A logged out');
-    
-    // ============================================================
-    // STEP 4: Login as User B
-    // ============================================================
-    await loginUser(page, USER_B.email, USER_B.password);
-    console.log('✅ User B logged in');
-    
-    // ============================================================
-    // STEP 5: Navigate to /cheltuieli as User B
-    // ============================================================
-    await page.goto('/cheltuieli');
-    
-    // CRITICAL ASSERTION 1: User A's record should NOT be visible to User B
-    await expect(page.getByText(testCategory)).not.toBeVisible();
-    console.log('✅ User A\'s record NOT visible to User B (initial check)');
-    
-    // ============================================================
-    // STEP 6: Reload the page to ensure no stale cache
-    // ============================================================
-    await page.reload();
-    
-    // CRITICAL ASSERTION 2: After reload, User A's record should STILL not be visible
-    await expect(page.getByText(testCategory)).not.toBeVisible();
-    console.log('✅ User A\'s record NOT visible to User B (after reload)');
-    
-    // Additional assertion: Ensure page loaded properly (not stuck on stale data)
-    await expect(page.getByText(/cheltuiel/i).first()).toBeVisible();
-  });
+function getCtx(): TestContext {
+  const required: Array<keyof TestContext> = [
+    'url',
+    'anonKey',
+    'serviceRoleKey',
+    'service',
+    'userA',
+    'userB',
+    'tenantAId',
+    'tenantBId',
+    'recordAId',
+    'recordBId',
+  ]
 
-  /**
-   * TEST 3: RLS Backend Enforcement (API-Level Verification)
-   * 
-   * Verifies that Supabase RLS policies enforce tenant isolation
-   * at the database level, not just in the UI.
-   */
-  test('TEST 3: Backend RLS filters cheltuieli_diverse by tenant', async ({ page }) => {
-    test.setTimeout(60000); // 60 seconds timeout
-    
-    // Login as User B
-    await loginUser(page, USER_B.email, USER_B.password);
-    console.log('✅ User B logged in for API test');
-    
-    // Setup request interception for Supabase REST API
-    let rlsVerified = false;
-    
-    page.on('response', async (response) => {
-      const url = response.url();
-      
-      // Check if this is a Supabase REST call to cheltuieli_diverse table
-      if (url.includes('/rest/v1/cheltuieli_diverse') && response.request().method() === 'GET') {
-        console.log('📡 Intercepted Supabase API call:', url);
-        
-        try {
-          const data = await response.json();
-          console.log('📦 Response data:', JSON.stringify(data, null, 2));
-          
-          // Verify that the response does NOT contain User A's test record
-          // The RLS policies should filter it out at the database level
-          if (Array.isArray(data)) {
-            const hasUserAData = data.some((record: any) => 
-              record.descriere && record.descriere.includes('Cheltuiala_UserA_Test')
-            );
-            
-            if (!hasUserAData) {
-              console.log('✅ RLS VERIFIED: User A\'s data NOT in API response');
-              rlsVerified = true;
-            } else {
-              console.error('❌ RLS FAILED: User A\'s data found in API response!');
-            }
-          }
-        } catch (e) {
-          // Not JSON or parsing failed - ignore
-          console.log('⚠️  Response not JSON or parsing failed');
-        }
-      }
-    });
-    
-    // Navigate to /cheltuieli to trigger API calls
-    await page.goto('/cheltuieli');
-    await expect(page.getByText(/cheltuiel/i).first()).toBeVisible();
-    
-    // Give it a moment to ensure all intercepted responses are processed
-    await page.waitForTimeout(2000);
-    
-    // If we didn't intercept the API call, trigger it manually
-    if (!rlsVerified) {
-      console.log('⚠️  No API call intercepted during initial load, triggering reload...');
-      await page.reload();
-      await expect(page.getByText(/cheltuiel/i).first()).toBeVisible();
-      await page.waitForTimeout(2000);
+  for (const key of required) {
+    if (!ctx[key]) {
+      throw new Error(`Security test context missing key: ${key}`)
     }
-    
-    // CRITICAL ASSERTION: RLS should have been verified
-    expect(rlsVerified).toBe(true);
-  });
-});
+  }
+
+  return ctx as TestContext
+}
+
+async function createTestUser(service: SupabaseClient, label: string) {
+  const email = `${uniqueToken(label)}@example.test`
+  const password = `Pwd!${Math.random().toString(36).slice(2, 10)}1A`
+
+  const { data, error } = await service.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+
+  if (error || !data.user) {
+    throw new Error(`Failed creating ${label}: ${error?.message ?? 'unknown error'}`)
+  }
+
+  return {
+    id: data.user.id,
+    email,
+    password,
+  }
+}
+
+async function signInUser(url: string, anonKey: string, email: string, password: string) {
+  const client = createClient(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  })
+
+  const { error } = await client.auth.signInWithPassword({ email, password })
+  if (error) {
+    throw new Error(`Failed sign in for ${email}: ${error.message}`)
+  }
+
+  return client
+}
+
+test.describe('Security Multi-Tenant RLS Suite', () => {
+  test.describe.configure({ mode: 'serial' })
+
+  test.beforeAll(async () => {
+    const url = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
+    const anonKey = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
+
+    const service = createClient(url, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    })
+
+    const userA = await createTestUser(service, 'tenant_a')
+    const userB = await createTestUser(service, 'tenant_b')
+
+    const { data: tenantA, error: tenantAError } = await service
+      .from('tenants')
+      .insert({
+        nume_ferma: uniqueToken('ferma_A'),
+        owner_user_id: userA.id,
+        plan: 'basic',
+      })
+      .select('id')
+      .single()
+
+    if (tenantAError || !tenantA?.id) {
+      throw new Error(`Failed creating tenant A: ${tenantAError?.message ?? 'unknown error'}`)
+    }
+
+    const { data: tenantB, error: tenantBError } = await service
+      .from('tenants')
+      .insert({
+        nume_ferma: uniqueToken('ferma_B'),
+        owner_user_id: userB.id,
+        plan: 'basic',
+      })
+      .select('id')
+      .single()
+
+    if (tenantBError || !tenantB?.id) {
+      throw new Error(`Failed creating tenant B: ${tenantBError?.message ?? 'unknown error'}`)
+    }
+
+    const createdAt = new Date().toISOString()
+
+    const { data: clientA, error: clientAError } = await service
+      .from('clienti')
+      .insert({
+        id_client: `CTA_${uniqueToken('a')}`,
+        nume_client: 'CLIENT_TENANT_A',
+        tenant_id: tenantA.id,
+        created_by: userA.id,
+        updated_by: userA.id,
+        created_at: createdAt,
+        updated_at: createdAt,
+      })
+      .select('id')
+      .single()
+
+    if (clientAError || !clientA?.id) {
+      throw new Error(`Failed creating seed client A: ${clientAError?.message ?? 'unknown error'}`)
+    }
+
+    const { data: clientB, error: clientBError } = await service
+      .from('clienti')
+      .insert({
+        id_client: `CTB_${uniqueToken('b')}`,
+        nume_client: 'CLIENT_TENANT_B',
+        tenant_id: tenantB.id,
+        created_by: userB.id,
+        updated_by: userB.id,
+        created_at: createdAt,
+        updated_at: createdAt,
+      })
+      .select('id')
+      .single()
+
+    if (clientBError || !clientB?.id) {
+      throw new Error(`Failed creating seed client B: ${clientBError?.message ?? 'unknown error'}`)
+    }
+
+    ctx.url = url
+    ctx.anonKey = anonKey
+    ctx.serviceRoleKey = serviceRoleKey
+    ctx.service = service
+    ctx.userA = userA
+    ctx.userB = userB
+    ctx.tenantAId = tenantA.id
+    ctx.tenantBId = tenantB.id
+    ctx.recordAId = clientA.id
+    ctx.recordBId = clientB.id
+  })
+
+  test.afterAll(async () => {
+    if (!ctx.service) return
+
+    try {
+      if (ctx.recordAId) {
+        await ctx.service.from('clienti').delete().eq('id', ctx.recordAId)
+      }
+      if (ctx.recordBId) {
+        await ctx.service.from('clienti').delete().eq('id', ctx.recordBId)
+      }
+      if (ctx.tenantAId) {
+        await ctx.service.from('tenants').delete().eq('id', ctx.tenantAId)
+      }
+      if (ctx.tenantBId) {
+        await ctx.service.from('tenants').delete().eq('id', ctx.tenantBId)
+      }
+      if (ctx.userA?.id) {
+        await ctx.service.auth.admin.deleteUser(ctx.userA.id)
+      }
+      if (ctx.userB?.id) {
+        await ctx.service.auth.admin.deleteUser(ctx.userB.id)
+      }
+    } catch {
+      // intentional no-op for teardown
+    }
+  })
+
+  test('userA cannot see userB data', async () => {
+    const c = getCtx()
+
+    const clientA = await signInUser(c.url, c.anonKey, c.userA.email, c.userA.password)
+    const { data, error } = await clientA.from('clienti').select('id,tenant_id').in('id', [c.recordAId, c.recordBId])
+
+    if (error) {
+      throw new Error(`Unexpected read error for userA: ${error.message}`)
+    }
+
+    const ids = (data ?? []).map((row) => row.id)
+
+    if (ids.includes(c.recordBId)) {
+      throw new Error('SECURITY FAILURE: userA can see userB record')
+    }
+
+    expect(ids).toContain(c.recordAId)
+  })
+
+  test('userA cannot modify userB data', async () => {
+    const c = getCtx()
+
+    const clientA = await signInUser(c.url, c.anonKey, c.userA.email, c.userA.password)
+    const probeName = `MUTATION_SHOULD_FAIL_${uniqueToken('x')}`
+
+    const { data, error } = await clientA
+      .from('clienti')
+      .update({ nume_client: probeName })
+      .eq('id', c.recordBId)
+      .select('id,nume_client')
+
+    if (error) {
+      const allowedCodes = new Set(['42501', 'PGRST116'])
+      if (!allowedCodes.has(error.code ?? '')) {
+        throw new Error(`Unexpected update error code for RLS test: ${error.code ?? 'none'} - ${error.message}`)
+      }
+    }
+
+    if ((data ?? []).length > 0) {
+      throw new Error('SECURITY FAILURE: userA update returned rows for userB record')
+    }
+
+    const { data: verifyRow, error: verifyErr } = await c.service
+      .from('clienti')
+      .select('nume_client')
+      .eq('id', c.recordBId)
+      .single()
+
+    if (verifyErr) {
+      throw new Error(`Verification read failed: ${verifyErr.message}`)
+    }
+
+    if (verifyRow.nume_client === probeName) {
+      throw new Error('SECURITY FAILURE: userA modified userB record in database')
+    }
+  })
+
+  test('userA cannot delete userB data', async () => {
+    const c = getCtx()
+
+    const clientA = await signInUser(c.url, c.anonKey, c.userA.email, c.userA.password)
+
+    const { data, error } = await clientA
+      .from('clienti')
+      .delete()
+      .eq('id', c.recordBId)
+      .select('id')
+
+    if (error) {
+      const allowedCodes = new Set(['42501', 'PGRST116'])
+      if (!allowedCodes.has(error.code ?? '')) {
+        throw new Error(`Unexpected delete error code for RLS test: ${error.code ?? 'none'} - ${error.message}`)
+      }
+    }
+
+    if ((data ?? []).length > 0) {
+      throw new Error('SECURITY FAILURE: userA delete returned deleted row for userB record')
+    }
+
+    const { data: verifyExists, error: verifyErr } = await c.service
+      .from('clienti')
+      .select('id')
+      .eq('id', c.recordBId)
+      .maybeSingle()
+
+    if (verifyErr) {
+      throw new Error(`Verification read failed: ${verifyErr.message}`)
+    }
+
+    if (!verifyExists?.id) {
+      throw new Error('SECURITY FAILURE: userA deleted userB record')
+    }
+  })
+
+  test('RLS blocks direct API query for other tenant', async ({ request }) => {
+    const c = getCtx()
+
+    const userClient = await signInUser(c.url, c.anonKey, c.userA.email, c.userA.password)
+    const {
+      data: { session },
+    } = await userClient.auth.getSession()
+
+    const accessToken = session?.access_token
+    if (!accessToken) {
+      throw new Error('Missing access token for userA direct API request')
+    }
+
+    const endpoint = `${c.url}/rest/v1/clienti?id=eq.${c.recordBId}&select=id,tenant_id`
+    const response = await request.get(endpoint, {
+      headers: {
+        apikey: c.anonKey,
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok()) {
+      const status = response.status()
+      if (status !== 401 && status !== 403) {
+        throw new Error(`Unexpected status for direct API RLS test: ${status}`)
+      }
+      return
+    }
+
+    const body = (await response.json()) as Array<{ id: string }>
+    if (Array.isArray(body) && body.some((row) => row.id === c.recordBId)) {
+      throw new Error('SECURITY FAILURE: direct API query returned another tenant record')
+    }
+
+    expect(Array.isArray(body)).toBeTruthy()
+  })
+
+  test('created_by and tenant_id cannot be modified manually', async () => {
+    const c = getCtx()
+
+    const clientA = await signInUser(c.url, c.anonKey, c.userA.email, c.userA.password)
+
+    const { error } = await clientA
+      .from('clienti')
+      .update({
+        created_by: c.userB.id,
+        tenant_id: c.tenantBId,
+      })
+      .eq('id', c.recordAId)
+
+    if (error && !['42501', 'PGRST116'].includes(error.code ?? '')) {
+      throw new Error(`Unexpected immutability update error: ${error.code ?? 'none'} - ${error.message}`)
+    }
+
+    const { data: verifyRow, error: verifyErr } = await c.service
+      .from('clienti')
+      .select('created_by,tenant_id')
+      .eq('id', c.recordAId)
+      .single()
+
+    if (verifyErr) {
+      throw new Error(`Verification read failed: ${verifyErr.message}`)
+    }
+
+    if (verifyRow.created_by !== c.userA.id) {
+      throw new Error('SECURITY FAILURE: created_by was modified manually')
+    }
+
+    if (verifyRow.tenant_id !== c.tenantAId) {
+      throw new Error('SECURITY FAILURE: tenant_id was modified manually')
+    }
+
+    expect(verifyRow.created_by).toBe(c.userA.id)
+    expect(verifyRow.tenant_id).toBe(c.tenantAId)
+  })
+})

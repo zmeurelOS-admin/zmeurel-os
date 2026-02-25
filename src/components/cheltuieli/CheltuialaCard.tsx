@@ -45,9 +45,6 @@ export function CheltuialaCard({ cheltuiala, onEdit, onDelete }: CheltuialaCardP
                 {cheltuiala.categorie || "Altele"}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
-              ID: {cheltuiala.id_cheltuiala}
-            </p>
           </div>
         </div>
       </CardHeader>

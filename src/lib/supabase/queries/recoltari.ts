@@ -1,21 +1,7 @@
-import { createClient } from '../client'
+﻿import { createClient } from '../client'
+import type { Tables, TablesInsert, TablesUpdate } from '@/types/supabase'
 
-// ===============================
-// TYPES (ALINIATE LA DB REAL)
-// ===============================
-
-export interface Recoltare {
-  id: string
-  id_recoltare: string
-  data: string
-  parcela_id: string | null
-  culegator_id: string | null
-  cantitate_kg: number
-  observatii: string | null
-  tenant_id: string
-  created_at: string
-  updated_at: string
-}
+export type Recoltare = Tables<'recoltari'>
 
 export interface CreateRecoltareInput {
   data: string
@@ -33,9 +19,8 @@ export interface UpdateRecoltareInput {
   observatii?: string
 }
 
-// ===============================
-// INTERNAL ID GENERATOR
-// ===============================
+type RecoltareInsert = TablesInsert<'recoltari'>
+type RecoltareUpdate = TablesUpdate<'recoltari'>
 
 async function generateNextId(): Promise<string> {
   const supabase = createClient()
@@ -53,15 +38,11 @@ async function generateNextId(): Promise<string> {
   const lastId = data[0].id_recoltare
   const numericPart = parseInt(lastId.replace('REC', ''), 10)
 
-  if (isNaN(numericPart)) throw new Error('Invalid id_recoltare format')
+  if (Number.isNaN(numericPart)) throw new Error('Invalid id_recoltare format')
 
   const nextNumber = numericPart + 1
   return `REC${nextNumber.toString().padStart(3, '0')}`
 }
-
-// ===============================
-// QUERIES (RLS-FIRST)
-// ===============================
 
 export async function getRecoltari(): Promise<Recoltare[]> {
   const supabase = createClient()
@@ -76,56 +57,43 @@ export async function getRecoltari(): Promise<Recoltare[]> {
   return data ?? []
 }
 
-export async function createRecoltare(
-  input: CreateRecoltareInput
-): Promise<Recoltare> {
+export async function createRecoltare(input: CreateRecoltareInput): Promise<Recoltare> {
   const supabase = createClient()
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    throw new Error('Trebuie să fii autentificat pentru a adăuga date.')
-  }
-
   const nextId = await generateNextId()
+
+  const payload: RecoltareInsert = {
+    id_recoltare: nextId,
+    data: input.data,
+    parcela_id: input.parcela_id,
+    culegator_id: input.culegator_id,
+    cantitate_kg: input.cantitate_kg,
+    observatii: input.observatii ?? null,
+  }
 
   const { data, error } = await supabase
     .from('recoltari')
-    .insert({
-      id_recoltare: nextId,
-      data: input.data,
-      parcela_id: input.parcela_id,
-      culegator_id: input.culegator_id,
-      cantitate_kg: input.cantitate_kg,
-      observatii: input.observatii ?? null,
-      tenant_id: user.id,
-    })
+    .insert(payload)
     .select()
     .single()
 
   if (error) {
-    console.error('Eroare la crearea recoltării:', error.message)
+    console.error('Eroare la crearea recoltarii:', error.message)
     throw error
   }
 
   return data
 }
 
-export async function updateRecoltare(
-  id: string,
-  input: UpdateRecoltareInput
-): Promise<Recoltare> {
+export async function updateRecoltare(id: string, input: UpdateRecoltareInput): Promise<Recoltare> {
   const supabase = createClient()
+  const payload: RecoltareUpdate = {
+    ...input,
+    updated_at: new Date().toISOString(),
+  }
 
   const { data, error } = await supabase
     .from('recoltari')
-    .update({
-      ...input,
-      updated_at: new Date().toISOString(),
-    })
+    .update(payload)
     .eq('id', id)
     .select()
     .single()

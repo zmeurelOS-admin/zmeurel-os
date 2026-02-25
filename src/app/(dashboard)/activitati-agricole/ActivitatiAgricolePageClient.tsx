@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import { Search, ClipboardList, Droplets, Scissors, Bug, Sprout, ArrowRight } from 'lucide-react'
+import { Fab } from '@/components/app/Fab'
 import { AddActivitateAgricolaDialog } from '@/components/activitati-agricole/AddActivitateAgricolaDialog'
 
 export default function ActivitatiPage() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
 
   const categorii = [
     { name: 'Tratamente', icon: Bug, color: '#EF4444', bg: '#FEF2F2' },
@@ -129,9 +131,8 @@ export default function ActivitatiPage() {
         </div>
       </div>
 
-      <div style={{ position: 'fixed', left: 20, right: 20, bottom: 140, zIndex: 100 }}>
-        <AddActivitateAgricolaDialog />
-      </div>
+      <Fab onClick={() => setAddOpen(true)} label="Adauga activitate" />
+      <AddActivitateAgricolaDialog open={addOpen} onOpenChange={setAddOpen} hideTrigger />
     </div>
   )
 }

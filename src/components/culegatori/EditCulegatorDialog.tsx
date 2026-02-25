@@ -1,4 +1,4 @@
-// src/components/culegatori/EditCulegatorDialog.tsx
+﻿// src/components/culegatori/EditCulegatorDialog.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,10 +23,10 @@ import type { Culegator } from '@/lib/supabase/queries/culegatori';
 // ========================================
 
 const culegatorSchema = z.object({
-  nume_prenume: z.string().min(2, 'Numele trebuie să aibă minim 2 caractere'),
+  nume_prenume: z.string().min(2, 'Numele trebuie sÄ aibÄ minim 2 caractere'),
   telefon: z.string().optional(),
-  tip_angajare: z.string().min(1, 'Selectează tipul de angajare'),
-  tarif_lei_kg: z.string().min(0, 'Tariful trebuie să fie mai mare sau egal cu 0'),
+  tip_angajare: z.string().min(1, 'SelecteazÄ tipul de angajare'),
+  tarif_lei_kg: z.string().min(0, 'Tariful trebuie sÄ fie mai mare sau egal cu 0'),
   data_angajare: z.string().optional(),
   status_activ: z.boolean(),
 });
@@ -64,7 +64,7 @@ export function EditCulegatorDialog({
     },
   });
 
-  // Populate form când se deschide dialog-ul cu un culegător
+  // Populate form cĂ˘nd se deschide dialog-ul cu un culegÄtor
   useEffect(() => {
     if (culegator && open) {
       form.reset({
@@ -102,7 +102,7 @@ export function EditCulegatorDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            Editează Culegător: {culegator.id_culegator}
+            EditeazÄ CulegÄtor: {culegator.nume_prenume}
           </DialogTitle>
         </DialogHeader>
 
@@ -110,7 +110,7 @@ export function EditCulegatorDialog({
           {/* Nume Prenume */}
           <div className="space-y-2">
             <Label htmlFor="nume_prenume">
-              Nume și Prenume <span className="text-red-500">*</span>
+              Nume Č™i Prenume <span className="text-red-500">*</span>
             </Label>
             <Input
               id="nume_prenume"
@@ -173,7 +173,7 @@ export function EditCulegatorDialog({
               style={{ backgroundColor: 'white', color: 'black' }}
             />
             <p className="text-xs text-muted-foreground">
-              Lasă 0 pentru culegători salarizați fix (nu plătiți la kg)
+              LasÄ 0 pentru culegÄtori salarizaČ›i fix (nu plÄtiČ›i la kg)
             </p>
             {form.formState.errors.tarif_lei_kg && (
               <p className="text-sm text-red-500">
@@ -202,7 +202,7 @@ export function EditCulegatorDialog({
               className="w-4 h-4"
             />
             <Label htmlFor="status_activ" className="font-normal cursor-pointer">
-              Culegător activ
+              CulegÄtor activ
             </Label>
           </div>
 
@@ -213,7 +213,7 @@ export function EditCulegatorDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Anulează
+              AnuleazÄ
             </Button>
             <Button
               type="submit"
@@ -223,10 +223,10 @@ export function EditCulegatorDialog({
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Se salvează...
+                  Se salveazÄ...
                 </>
               ) : (
-                'Salvează Modificări'
+                'SalveazÄ ModificÄri'
               )}
             </Button>
           </DialogFooter>

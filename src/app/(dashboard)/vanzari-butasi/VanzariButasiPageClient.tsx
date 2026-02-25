@@ -1,175 +1,163 @@
-'use client';
+'use client'
 
-import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
+import { AppShell } from '@/components/app/AppShell'
+import { EmptyState } from '@/components/app/EmptyState'
+import { ErrorState } from '@/components/app/ErrorState'
+import { Fab } from '@/components/app/Fab'
+import { LoadingState } from '@/components/app/LoadingState'
+import { PageHeader } from '@/components/app/PageHeader'
+import { StickyActionBar } from '@/components/app/StickyActionBar'
+import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog'
+import { AddVanzareButasiDialog } from '@/components/vanzari-butasi/AddVanzareButasiDialog'
+import { EditVanzareButasiDialog } from '@/components/vanzari-butasi/EditVanzareButasiDialog'
+import { VanzareButasiCard } from '@/components/vanzari-butasi/VanzareButasiCard'
+import { Input } from '@/components/ui/input'
 import {
-  VanzareButasi,
-  getVanzariButasi,
   deleteVanzareButasi,
-} from '@/lib/supabase/queries/vanzari-butasi';
-
-import { VanzareButasiCard } from '@/components/vanzari-butasi/VanzareButasiCard';
-import { AddVanzareButasiDialog } from '@/components/vanzari-butasi/AddVanzareButasiDialog';
-import { EditVanzareButasiDialog } from '@/components/vanzari-butasi/EditVanzareButasiDialog';
-import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog';
+  getVanzariButasi,
+  type VanzareButasi,
+} from '@/lib/supabase/queries/vanzari-butasi'
 
 interface Client {
-  id: string;
-  id_client: string;
-  nume_client: string;
+  id: string
+  nume_client: string
 }
 
 interface Parcela {
-  id: string;
-  id_parcela: string;
-  nume_parcela: string;
+  id: string
+  nume_parcela: string
 }
 
 interface VanzariButasiPageClientProps {
-  initialVanzari: VanzareButasi[];
-  clienti: Client[];
-  parcele: Parcela[];
+  initialVanzari: VanzareButasi[]
+  clienti: Client[]
+  parcele: Parcela[]
 }
 
-export function VanzariButasiPageClient({
-  initialVanzari,
-  clienti,
-  parcele,
-}: VanzariButasiPageClientProps) {
-  const queryClient = useQueryClient();
+export function VanzariButasiPageClient({ initialVanzari, clienti, parcele }: VanzariButasiPageClientProps) {
+  const queryClient = useQueryClient()
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [editingVanzare, setEditingVanzare] = useState<VanzareButasi | null>(null);
-  const [deletingVanzare, setDeletingVanzare] = useState<VanzareButasi | null>(null);
+  const [searchTerm, setSearchTerm] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
+  const [editingVanzare, setEditingVanzare] = useState<VanzareButasi | null>(null)
+  const [deletingVanzare, setDeletingVanzare] = useState<VanzareButasi | null>(null)
 
-  const { data: vanzari = initialVanzari } = useQuery({
+  const {
+    data: vanzari = initialVanzari,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ['vanzari-butasi'],
     queryFn: getVanzariButasi,
     initialData: initialVanzari,
-  });
+  })
 
   const deleteMutation = useMutation({
     mutationFn: deleteVanzareButasi,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vanzari-butasi'] });
-      toast.success('Vânzare ștearsă cu succes!');
-      setDeletingVanzare(null);
+      queryClient.invalidateQueries({ queryKey: ['vanzari-butasi'] })
+      toast.success('Vanzare stearsa')
+      setDeletingVanzare(null)
     },
-    onError: () => {
-      toast.error('Eroare la ștergere');
+    onError: (err: Error) => {
+      toast.error(err.message)
     },
-  });
+  })
 
   const clientMap = useMemo(() => {
-    const map: Record<string, string> = {};
+    const map: Record<string, string> = {}
     clienti.forEach((c) => {
-      map[c.id] = `${c.id_client} - ${c.nume_client}`;
-    });
-    return map;
-  }, [clienti]);
+      map[c.id] = c.nume_client || 'Client'
+    })
+    return map
+  }, [clienti])
 
   const parcelaMap = useMemo(() => {
-    const map: Record<string, string> = {};
+    const map: Record<string, string> = {}
     parcele.forEach((p) => {
-      map[p.id] = `${p.id_parcela} - ${p.nume_parcela}`;
-    });
-    return map;
-  }, [parcele]);
+      map[p.id] = p.nume_parcela || 'Parcela'
+    })
+    return map
+  }, [parcele])
 
   const filteredVanzari = useMemo(() => {
-    if (!searchTerm) return vanzari;
-
-    const term = searchTerm.toLowerCase();
+    if (!searchTerm) return vanzari
+    const term = searchTerm.toLowerCase()
 
     return vanzari.filter(
       (vb) =>
-        vb.id_vanzare_butasi.toLowerCase().includes(term) ||
         vb.soi_butasi?.toLowerCase().includes(term) ||
         (vb.client_id && clientMap[vb.client_id]?.toLowerCase().includes(term)) ||
         vb.observatii?.toLowerCase().includes(term)
-    );
-  }, [vanzari, searchTerm, clientMap]);
+    )
+  }, [vanzari, searchTerm, clientMap])
 
-  const totalVenit = useMemo(() => {
-    return filteredVanzari.reduce(
-      (sum, vb) => sum + vb.cantitate_butasi * vb.pret_unitar_lei,
-      0
-    );
-  }, [filteredVanzari]);
-
-  const confirmDelete = () => {
-    if (deletingVanzare) {
-      deleteMutation.mutate(deletingVanzare.id);
-    }
-  };
+  const totalVenit = useMemo(
+    () => filteredVanzari.reduce((sum, vb) => sum + vb.cantitate_butasi * vb.pret_unitar_lei, 0),
+    [filteredVanzari]
+  )
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Vânzări Butași</h1>
-          <p className="text-gray-600 mt-1">
-            Gestionează vânzările de material săditor
-          </p>
-        </div>
-        <AddVanzareButasiDialog />
+    <AppShell
+      header={<PageHeader title="Vanzari Butasi" subtitle="Gestionare vanzari material saditor" />}
+      fab={<Fab onClick={() => setAddOpen(true)} label="Adauga vanzare butasi" />}
+      bottomBar={
+        <StickyActionBar>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-[var(--agri-text-muted)]">Venit total: {totalVenit.toFixed(2)} lei</p>
+          </div>
+        </StickyActionBar>
+      }
+    >
+      <div className="mx-auto w-full max-w-4xl space-y-4 py-4">
+        <Input className="agri-control h-12" placeholder="Cauta dupa soi, client sau observatii..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+
+        {isError ? <ErrorState title="Eroare" message={(error as Error).message} /> : null}
+        {isLoading ? <LoadingState label="Se incarca vanzarile..." /> : null}
+        {!isLoading && !isError && filteredVanzari.length === 0 ? <EmptyState title="Nu exista vanzari" /> : null}
+
+        {!isLoading && !isError && filteredVanzari.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {filteredVanzari.map((vanzare) => (
+              <VanzareButasiCard
+                key={vanzare.id}
+                vanzare={vanzare}
+                clientNume={vanzare.client_id ? clientMap[vanzare.client_id] : undefined}
+                parcelaNume={vanzare.parcela_sursa_id ? parcelaMap[vanzare.parcela_sursa_id] : undefined}
+                onEdit={setEditingVanzare}
+                onDelete={setDeletingVanzare}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <Card>
-        <CardContent className="p-6">
-          <p className="text-sm text-gray-600">Venit total</p>
-          <p className="text-3xl font-bold text-green-600">
-            {totalVenit.toFixed(2)} lei
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <Input
-            placeholder="Caută..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredVanzari.map((vanzare) => (
-          <VanzareButasiCard
-            key={vanzare.id}
-            vanzare={vanzare}
-            clientNume={
-              vanzare.client_id ? clientMap[vanzare.client_id] : undefined
-            }
-            parcelaNume={
-              vanzare.parcela_sursa_id
-                ? parcelaMap[vanzare.parcela_sursa_id]
-                : undefined
-            }
-            onEdit={setEditingVanzare}
-            onDelete={setDeletingVanzare}
-          />
-        ))}
-      </div>
+      <AddVanzareButasiDialog open={addOpen} onOpenChange={setAddOpen} hideTrigger />
 
       <EditVanzareButasiDialog
         vanzare={editingVanzare}
         open={!!editingVanzare}
-        onOpenChange={(open) => !open && setEditingVanzare(null)}
+        onOpenChange={(open) => {
+          if (!open) setEditingVanzare(null)
+        }}
       />
 
       <DeleteConfirmDialog
         open={!!deletingVanzare}
-        onOpenChange={(open) => !open && setDeletingVanzare(null)}
-        onConfirm={confirmDelete}
-        itemName={deletingVanzare?.id_vanzare_butasi || ''}
-        itemType="vânzare"
+        onOpenChange={(open) => {
+          if (!open) setDeletingVanzare(null)
+        }}
+        onConfirm={() => {
+          if (deletingVanzare) deleteMutation.mutate(deletingVanzare.id)
+        }}
+        itemName={deletingVanzare?.data ? `din ${new Date(deletingVanzare.data).toLocaleDateString('ro-RO')}` : ''}
+        itemType="vanzare"
       />
-    </div>
-  );
+    </AppShell>
+  )
 }

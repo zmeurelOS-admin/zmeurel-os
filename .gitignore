@@ -52,4 +52,5 @@ playwright-report/
 *.zip
 
 # Local generated files
-repomix-output.xml
+repomix-output.xmlplaywright-report/
+test-results/

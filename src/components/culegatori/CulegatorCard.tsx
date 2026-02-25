@@ -26,9 +26,6 @@ export function CulegatorCard({ culegator, onEdit, onDelete }: CulegatorCardProp
               <CardTitle className="text-lg font-semibold">
                 {culegator.nume_prenume}
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                ID: {culegator.id_culegator}
-              </p>
             </div>
           </div>
           

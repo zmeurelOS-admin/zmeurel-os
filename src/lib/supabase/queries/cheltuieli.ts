@@ -4,17 +4,23 @@ import { createClient } from '../client';
 export interface Cheltuiala {
   id: string;
   id_cheltuiala: string;
+  client_sync_id: string;
   data: string;
   categorie: string | null;
   descriere: string | null;
   suma_lei: number;
   furnizor: string | null;
   document_url: string | null;
+  sync_status: string | null;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateCheltuialaInput {
+  client_sync_id?: string;
+  sync_status?: string;
   data: string;
   categorie?: string;
   descriere?: string;
@@ -31,13 +37,6 @@ export interface UpdateCheltuialaInput {
   furnizor?: string;
   document_url?: string;
 }
-
-/**
- * 🔐 RLS-FIRST ARCHITECTURE
- * 
- * tenant_id is NOT sent from client code.
- * RLS policies + database triggers handle tenant isolation.
- */
 
 async function generateNextId(): Promise<string> {
   const supabase = createClient();
@@ -85,62 +84,33 @@ export async function getCheltuieli(): Promise<Cheltuiala[]> {
   return data ?? [];
 }
 
-/**
- * CREATE CHELTUIALA (RLS-FIRST)
- * 
- * 🔐 RLS REQUIREMENTS:
- * - tenant_id MUST be set automatically via BEFORE INSERT trigger OR RLS WITH CHECK policy
- * - INSERT policy must exist with WITH CHECK validating tenant_id matches current user's tenant
- * 
- * 📋 DB SCHEMA EXPECTATIONS:
- * - tenant_id: NOT NULL (required)
- * - tenant_id: No DEFAULT value (set via trigger)
- * 
- * 🔧 REQUIRED TRIGGER (if not using RLS WITH CHECK to set):
- * CREATE FUNCTION set_tenant_id_cheltuieli()
- * RETURNS trigger AS $$
- * BEGIN
- *   NEW.tenant_id := (
- *     SELECT id FROM tenants
- *     WHERE owner_user_id = auth.uid()
- *   );
- *   RETURN NEW;
- * END;
- * $$ LANGUAGE plpgsql;
- * 
- * CREATE TRIGGER set_tenant_before_insert_cheltuieli
- * BEFORE INSERT ON cheltuieli_diverse
- * FOR EACH ROW EXECUTE FUNCTION set_tenant_id_cheltuieli();
- * 
- * 🔒 REQUIRED RLS POLICY:
- * CREATE POLICY tenant_isolation_insert_cheltuieli
- * ON cheltuieli_diverse
- * FOR INSERT
- * WITH CHECK (
- *   tenant_id = (
- *     SELECT id FROM tenants
- *     WHERE owner_user_id = auth.uid()
- *   )
- * );
- */
 export async function createCheltuiala(
   input: CreateCheltuialaInput
 ): Promise<Cheltuiala> {
   const supabase = createClient();
   const nextId = await generateNextId();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data, error } = await supabase
     .from('cheltuieli_diverse')
-    .insert({
-      id_cheltuiala: nextId,
-      data: input.data,
-      categorie: input.categorie || null,
-      descriere: input.descriere || null,
-      suma_lei: input.suma_lei,
-      furnizor: input.furnizor || null,
-      document_url: input.document_url || null,
-      // tenant_id is NOT included - must be set by trigger or RLS policy
-    })
+    .upsert(
+      {
+        client_sync_id: input.client_sync_id ?? crypto.randomUUID(),
+        id_cheltuiala: nextId,
+        data: input.data,
+        categorie: input.categorie || null,
+        descriere: input.descriere || null,
+        suma_lei: input.suma_lei,
+        furnizor: input.furnizor || null,
+        document_url: input.document_url || null,
+        sync_status: input.sync_status ?? 'synced',
+        created_by: user?.id ?? null,
+        updated_by: user?.id ?? null,
+      },
+      { onConflict: 'client_sync_id' }
+    )
     .select()
     .single();
 

@@ -1,29 +1,30 @@
-// src/app/(dashboard)/investitii/InvestitiiPageClient.tsx
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChartNoAxesColumn } from 'lucide-react'
 import { toast } from 'sonner'
-import { Search, DollarSign, TrendingDown, Calculator } from 'lucide-react'
 
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-
-import {
-  Investitie,
-  getInvestitii,
-  deleteInvestitie,
-} from '@/lib/supabase/queries/investitii'
-
-import { InvestitieCard } from '@/components/investitii/InvestitieCard'
+import { AppShell } from '@/components/app/AppShell'
+import { EmptyState } from '@/components/app/EmptyState'
+import { ErrorState } from '@/components/app/ErrorState'
+import { Fab } from '@/components/app/Fab'
+import { LoadingState } from '@/components/app/LoadingState'
+import { PageHeader } from '@/components/app/PageHeader'
+import { StickyActionBar } from '@/components/app/StickyActionBar'
+import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog'
 import { AddInvestitieDialog } from '@/components/investitii/AddInvestitieDialog'
 import { EditInvestitieDialog } from '@/components/investitii/EditInvestitieDialog'
-import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog'
+import { InvestitieCard } from '@/components/investitii/InvestitieCard'
+import { Input } from '@/components/ui/input'
+import {
+  deleteInvestitie,
+  getInvestitii,
+  type Investitie,
+} from '@/lib/supabase/queries/investitii'
 
 interface Parcela {
   id: string
-  id_parcela: string
   nume_parcela: string
 }
 
@@ -32,20 +33,20 @@ interface InvestitiiPageClientProps {
   parcele: Parcela[]
 }
 
-export function InvestitiiPageClient({
-  initialInvestitii,
-  parcele,
-}: InvestitiiPageClientProps) {
+export function InvestitiiPageClient({ initialInvestitii, parcele }: InvestitiiPageClientProps) {
   const queryClient = useQueryClient()
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedMonth, setSelectedMonth] = useState<string>('all')
-  const [editingInvestitie, setEditingInvestitie] =
-    useState<Investitie | null>(null)
-  const [deletingInvestitie, setDeletingInvestitie] =
-    useState<Investitie | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [editingInvestitie, setEditingInvestitie] = useState<Investitie | null>(null)
+  const [deletingInvestitie, setDeletingInvestitie] = useState<Investitie | null>(null)
 
-  const { data: investitii = initialInvestitii } = useQuery({
+  const {
+    data: investitii = initialInvestitii,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ['investitii'],
     queryFn: getInvestitii,
     initialData: initialInvestitii,
@@ -55,216 +56,95 @@ export function InvestitiiPageClient({
     mutationFn: deleteInvestitie,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investitii'] })
-      toast.success('Investiție ștearsă cu succes!')
+      toast.success('Investitie stearsa')
       setDeletingInvestitie(null)
     },
-    onError: (error) => {
-      console.error('Error deleting investitie:', error)
-      toast.error('Eroare la ștergerea investiției')
+    onError: (err: Error) => {
+      toast.error(err.message)
     },
   })
 
   const parcelaMap = useMemo(() => {
     const map: Record<string, string> = {}
     parcele.forEach((p) => {
-      map[p.id] = `${p.id_parcela} - ${p.nume_parcela}`
+      map[p.id] = p.nume_parcela || 'Parcela'
     })
     return map
   }, [parcele])
 
-  const availableMonths = useMemo(() => {
-    const months = new Set<string>()
-    investitii.forEach((inv) => {
-      const date = new Date(inv.data)
-      const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1)
-        .toString()
-        .padStart(2, '0')}`
-      months.add(monthKey)
-    })
-    return Array.from(months).sort().reverse()
-  }, [investitii])
-
-  const formatMonth = (monthKey: string) => {
-    const [year, month] = monthKey.split('-')
-    const date = new Date(parseInt(year), parseInt(month) - 1)
-    return date.toLocaleDateString('ro-RO', {
-      year: 'numeric',
-      month: 'long',
-    })
-  }
-
   const filteredInvestitii = useMemo(() => {
-    let filtered = investitii
+    if (!searchTerm) return investitii
+    const term = searchTerm.toLowerCase()
 
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      filtered = filtered.filter(
-        (inv) =>
-          inv.id_investitie.toLowerCase().includes(term) ||
-          inv.categorie?.toLowerCase().includes(term) ||
-          inv.furnizor?.toLowerCase().includes(term) ||
-          inv.descriere?.toLowerCase().includes(term)
-      )
-    }
-
-    if (selectedMonth !== 'all') {
-      filtered = filtered.filter((inv) => {
-        const date = new Date(inv.data)
-        const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1)
-          .toString()
-          .padStart(2, '0')}`
-        return monthKey === selectedMonth
-      })
-    }
-
-    return filtered
-  }, [investitii, searchTerm, selectedMonth])
+    return investitii.filter(
+      (inv) =>
+        inv.categorie?.toLowerCase().includes(term) ||
+        inv.furnizor?.toLowerCase().includes(term) ||
+        inv.descriere?.toLowerCase().includes(term)
+    )
+  }, [investitii, searchTerm])
 
   const stats = useMemo(() => {
     const total = filteredInvestitii.length
-    const sumaTotala = filteredInvestitii.reduce(
-      (sum, inv) => sum + inv.suma_lei,
-      0
-    )
-    const medie = total > 0 ? sumaTotala / total : 0
-
-    return { total, sumaTotala, medie }
+    const sumaTotala = filteredInvestitii.reduce((sum, inv) => sum + inv.suma_lei, 0)
+    return { total, sumaTotala }
   }, [filteredInvestitii])
 
-  const formatSuma = (suma: number) => {
-    return new Intl.NumberFormat('ro-RO', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(suma)
-  }
-
-  const handleEdit = (investitie: Investitie) => {
-    setEditingInvestitie(investitie)
-  }
-
-  const handleDelete = (investitie: Investitie) => {
-    setDeletingInvestitie(investitie)
-  }
-
-  const confirmDelete = () => {
-    if (deletingInvestitie) {
-      deleteMutation.mutate(deletingInvestitie.id)
-    }
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Investiții (CAPEX)
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Gestionează investițiile în plantație
-          </p>
-        </div>
-        <AddInvestitieDialog />
+    <AppShell
+      header={<PageHeader title="Investitii" subtitle="Monitorizare CAPEX" rightSlot={<ChartNoAxesColumn className="h-5 w-5" />} />}
+      fab={<Fab onClick={() => setAddOpen(true)} label="Adauga investitie" />}
+      bottomBar={
+        <StickyActionBar>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-[var(--agri-text-muted)]">Total investit: {stats.sumaTotala.toFixed(2)} lei</p>
+          </div>
+        </StickyActionBar>
+      }
+    >
+      <div className="mx-auto w-full max-w-4xl space-y-4 py-4">
+        <Input className="agri-control h-12" placeholder="Cauta investitie..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+
+        {isError ? <ErrorState title="Eroare" message={(error as Error).message} /> : null}
+        {isLoading ? <LoadingState label="Se incarca investitiile..." /> : null}
+        {!isLoading && !isError && filteredInvestitii.length === 0 ? <EmptyState title="Nu exista investitii" /> : null}
+
+        {!isLoading && !isError && filteredInvestitii.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {filteredInvestitii.map((investitie) => (
+              <InvestitieCard
+                key={investitie.id}
+                investitie={investitie}
+                parcelaNume={investitie.parcela_id ? parcelaMap[investitie.parcela_id] : undefined}
+                onEdit={setEditingInvestitie}
+                onDelete={setDeletingInvestitie}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">
-                  Total Investiții
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {stats.total}
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">
-                  Sumă Totală Investită
-                </p>
-                <p className="text-3xl font-bold text-red-600 mt-1">
-                  -{formatSuma(stats.sumaTotala)} lei
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <TrendingDown className="h-6 w-6 text-red-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">
-                  Medie per Investiție
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {formatSuma(stats.medie)} lei
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Calculator className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {filteredInvestitii.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Nicio investiție găsită
-            </h3>
-            <p className="text-gray-600">
-              Adaugă prima investiție pentru a începe tracking-ul CAPEX
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredInvestitii.map((investitie) => (
-            <InvestitieCard
-              key={investitie.id}
-              investitie={investitie}
-              parcelaNume={
-                investitie.parcela_id
-                  ? parcelaMap[investitie.parcela_id]
-                  : undefined
-              }
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
+      <AddInvestitieDialog open={addOpen} onOpenChange={setAddOpen} hideTrigger />
 
       <EditInvestitieDialog
         investitie={editingInvestitie}
         open={!!editingInvestitie}
-        onOpenChange={(open) => !open && setEditingInvestitie(null)}
+        onOpenChange={(open) => {
+          if (!open) setEditingInvestitie(null)
+        }}
       />
 
       <DeleteConfirmDialog
         open={!!deletingInvestitie}
-        onOpenChange={(open) => !open && setDeletingInvestitie(null)}
-        onConfirm={confirmDelete}
-        itemName={deletingInvestitie?.id_investitie || ''}
-        itemType="investiție"
+        onOpenChange={(open) => {
+          if (!open) setDeletingInvestitie(null)
+        }}
+        onConfirm={() => {
+          if (deletingInvestitie) deleteMutation.mutate(deletingInvestitie.id)
+        }}
+        itemName={deletingInvestitie?.categorie || 'investitia selectata'}
+        itemType="investitie"
       />
-    </div>
+    </AppShell>
   )
 }

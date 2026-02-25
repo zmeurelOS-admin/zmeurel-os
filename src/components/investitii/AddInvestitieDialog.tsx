@@ -1,4 +1,4 @@
-// src/components/investitii/AddInvestitieDialog.tsx
+﻿// src/components/investitii/AddInvestitieDialog.tsx
 'use client'
 
 import { useState } from 'react'
@@ -28,10 +28,6 @@ import {
 
 import { getParcele } from '@/lib/supabase/queries/parcele'
 
-// ===============================
-// VALIDATION
-// ===============================
-
 const investitieSchema = z.object({
   data: z.string().min(1, 'Data este obligatorie'),
   parcela_id: z.string().optional(),
@@ -43,15 +39,23 @@ const investitieSchema = z.object({
 
 type InvestitieFormData = z.infer<typeof investitieSchema>
 
-// ===============================
-// COMPONENT
-// ===============================
+interface AddInvestitieDialogProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  hideTrigger?: boolean
+}
 
-export function AddInvestitieDialog() {
-  const [open, setOpen] = useState(false)
+export function AddInvestitieDialog({ open, onOpenChange, hideTrigger = false }: AddInvestitieDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isControlled = typeof open === 'boolean'
+  const dialogOpen = isControlled ? open : internalOpen
+  const setDialogOpen = (nextOpen: boolean) => {
+    if (!isControlled) setInternalOpen(nextOpen)
+    onOpenChange?.(nextOpen)
+  }
+
   const queryClient = useQueryClient()
 
-  // RLS-first
   const { data: parcele = [] } = useQuery({
     queryKey: ['parcele'],
     queryFn: getParcele,
@@ -78,13 +82,13 @@ export function AddInvestitieDialog() {
     mutationFn: createInvestitie,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investitii'] })
-      toast.success('Investiție adăugată cu succes!')
+      toast.success('Investitie adaugata cu succes!')
       reset()
-      setOpen(false)
+      setDialogOpen(false)
     },
     onError: (error) => {
       console.error('Error creating investitie:', error)
-      toast.error('Eroare la adăugarea investiției')
+      toast.error('Eroare la adaugarea investitiei')
     },
   })
 
@@ -100,26 +104,28 @@ export function AddInvestitieDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-[#F16B6B] hover:bg-[#E05A5A]">
-          <Plus className="h-4 w-4 mr-2" />
-          Adaugă Investiție
-        </Button>
-      </DialogTrigger>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {!hideTrigger ? (
+        <DialogTrigger asChild>
+          <Button className="bg-[#F16B6B] hover:bg-[#E05A5A]">
+            <Plus className="h-4 w-4 mr-2" />
+            Adauga Investitie
+          </Button>
+        </DialogTrigger>
+      ) : null}
 
       <DialogContent
         className="max-w-md max-h-[75vh] overflow-y-auto"
         style={{ backgroundColor: 'white' }}
       >
         <DialogHeader>
-          <DialogTitle>Adaugă Investiție Nouă (CAPEX)</DialogTitle>
+          <DialogTitle>Adauga Investitie Noua (CAPEX)</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="data" className="text-sm">
-              Data investiției <span className="text-red-500">*</span>
+              Data investitiei <span className="text-red-500">*</span>
             </Label>
             <Input
               id="data"
@@ -131,19 +137,17 @@ export function AddInvestitieDialog() {
 
           <div className="space-y-1">
             <Label htmlFor="categorie" className="text-sm">
-              Categorie investiție <span className="text-red-500">*</span>
+              Categorie investitie <span className="text-red-500">*</span>
             </Label>
             <select
               id="categorie"
               {...register('categorie')}
               className={`flex h-10 w-full rounded-md border px-3 py-2 text-sm ${
-                errors.categorie
-                  ? 'border-red-500'
-                  : 'border-gray-300'
+                errors.categorie ? 'border-red-500' : 'border-gray-300'
               }`}
               style={{ backgroundColor: 'white' }}
             >
-              <option value="">Selectează categoria...</option>
+              <option value="">Selecteaza categoria...</option>
               {CATEGORII_INVESTITII.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
@@ -154,7 +158,7 @@ export function AddInvestitieDialog() {
 
           <div className="space-y-1">
             <Label htmlFor="parcela_id" className="text-sm">
-              Parcelă
+              Parcela
             </Label>
             <select
               id="parcela_id"
@@ -162,10 +166,10 @@ export function AddInvestitieDialog() {
               className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
               style={{ backgroundColor: 'white' }}
             >
-              <option value="">Fără legătură cu parcelă</option>
+              <option value="">Fara legatura cu parcela</option>
               {parcele.map((parcela: any) => (
                 <option key={parcela.id} value={parcela.id}>
-                  {parcela.id_parcela} - {parcela.nume_parcela}
+                  {parcela.nume_parcela || 'Parcela'}
                 </option>
               ))}
             </select>
@@ -173,7 +177,7 @@ export function AddInvestitieDialog() {
 
           <div className="space-y-1">
             <Label htmlFor="suma_lei" className="text-sm">
-              Sumă investită (lei) <span className="text-red-500">*</span>
+              Suma investita (lei) <span className="text-red-500">*</span>
             </Label>
             <Input
               id="suma_lei"
@@ -204,19 +208,17 @@ export function AddInvestitieDialog() {
               variant="outline"
               onClick={() => {
                 reset()
-                setOpen(false)
+                setDialogOpen(false)
               }}
             >
-              Anulează
+              Anuleaza
             </Button>
             <Button
               type="submit"
               disabled={createMutation.isPending}
               className="bg-[#F16B6B] hover:bg-[#E05A5A]"
             >
-              {createMutation.isPending
-                ? 'Se salvează...'
-                : 'Salvează'}
+              {createMutation.isPending ? 'Se salveaza...' : 'Salveaza'}
             </Button>
           </div>
         </form>

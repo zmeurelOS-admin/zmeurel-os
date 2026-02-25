@@ -1,54 +1,67 @@
-'use client';
+'use client'
 
-import { useMemo, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
+import { AppDialog } from '@/components/app/AppDialog'
+import { AppShell } from '@/components/app/AppShell'
+import { EmptyState } from '@/components/app/EmptyState'
+import { ErrorState } from '@/components/app/ErrorState'
+import { Fab } from '@/components/app/Fab'
+import { LoadingState } from '@/components/app/LoadingState'
+import { PageHeader } from '@/components/app/PageHeader'
+import { StickyActionBar } from '@/components/app/StickyActionBar'
+import { AddCheltuialaDialog } from '@/components/cheltuieli/AddCheltuialaDialog'
+import { CheltuialaCard } from '@/components/cheltuieli/CheltuialaCard'
+import { EditCheltuialaDialog } from '@/components/cheltuieli/EditCheltuialaDialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
-  getCheltuieli,
   createCheltuiala,
-  updateCheltuiala,
   deleteCheltuiala,
+  getCheltuieli,
+  updateCheltuiala,
   type Cheltuiala,
-} from '@/lib/supabase/queries/cheltuieli';
-
-import { AddCheltuialaDialog } from '@/components/cheltuieli/AddCheltuialaDialog';
-import { EditCheltuialaDialog } from '@/components/cheltuieli/EditCheltuialaDialog';
-import { CheltuialaCard } from '@/components/cheltuieli/CheltuialaCard';
-
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+} from '@/lib/supabase/queries/cheltuieli'
 
 interface CheltuialaFormData {
-  data: string;
-  categorie: string;
-  suma_lei: number | string;
-  furnizor?: string;
-  descriere?: string;
+  client_sync_id?: string
+  data: string
+  categorie: string
+  suma_lei: number | string
+  furnizor?: string
+  descriere?: string
 }
 
 interface CheltuialaPageClientProps {
-  initialCheltuieli: Cheltuiala[];
+  initialCheltuieli: Cheltuiala[]
 }
 
 export function CheltuialaPageClient({ initialCheltuieli }: CheltuialaPageClientProps) {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
 
-  const [search, setSearch] = useState('');
-  const [addOpen, setAddOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing] = useState<Cheltuiala | null>(null);
+  const [search, setSearch] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editing, setEditing] = useState<Cheltuiala | null>(null)
+  const [deleting, setDeleting] = useState<Cheltuiala | null>(null)
 
-  const { data: cheltuieli = initialCheltuieli, isLoading } = useQuery({
+  const {
+    data: cheltuieli = initialCheltuieli,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ['cheltuieli'],
-    queryFn: () => getCheltuieli(),
+    queryFn: getCheltuieli,
     initialData: initialCheltuieli,
-  });
+  })
 
   const createMutation = useMutation({
     mutationFn: (data: CheltuialaFormData) =>
       createCheltuiala({
+        client_sync_id: data.client_sync_id,
         data: data.data,
         categorie: data.categorie,
         suma_lei: Number(data.suma_lei),
@@ -57,14 +70,18 @@ export function CheltuialaPageClient({ initialCheltuieli }: CheltuialaPageClient
         document_url: undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cheltuieli'] });
-      toast.success('Cheltuială adăugată');
+      queryClient.invalidateQueries({ queryKey: ['cheltuieli'] })
+      toast.success('Cheltuiala adaugata')
     },
-    onError: (err) => {
-      console.error(err);
-      toast.error('Eroare la adăugare cheltuială');
+    onError: (err: Error & { status?: number; code?: string }) => {
+      const conflict = err?.status === 409 || err?.code === '23505'
+      if (conflict) {
+        toast.info('Inregistrarea era deja sincronizata.')
+        return
+      }
+      toast.error(err.message)
     },
-  });
+  })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: CheltuialaFormData }) =>
@@ -76,142 +93,93 @@ export function CheltuialaPageClient({ initialCheltuieli }: CheltuialaPageClient
         descriere: payload.descriere || undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cheltuieli'] });
-      toast.success('Cheltuială actualizată');
+      queryClient.invalidateQueries({ queryKey: ['cheltuieli'] })
+      toast.success('Cheltuiala actualizata')
     },
-    onError: (err) => {
-      console.error(err);
-      toast.error('Eroare la actualizare cheltuială');
+    onError: (err: Error) => {
+      toast.error(err.message)
     },
-  });
+  })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteCheltuiala(id),
+    mutationFn: deleteCheltuiala,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cheltuieli'] });
-      toast.success('Cheltuială ștearsă');
+      queryClient.invalidateQueries({ queryKey: ['cheltuieli'] })
+      toast.success('Cheltuiala stearsa')
+      setDeleting(null)
     },
-    onError: (err) => {
-      console.error(err);
-      toast.error('Eroare la ștergere cheltuială');
+    onError: (err: Error) => {
+      toast.error(err.message)
     },
-  });
+  })
 
   const filtered = useMemo(() => {
-    const s = search.toLowerCase();
-    return cheltuieli.filter((c) => (c.categorie ?? '').toLowerCase().includes(s));
-  }, [cheltuieli, search]);
+    const s = search.toLowerCase()
+    return cheltuieli.filter((c) => (c.categorie ?? '').toLowerCase().includes(s))
+  }, [cheltuieli, search])
 
-  const total = useMemo(
-    () => filtered.reduce((sum, c) => sum + Number(c.suma_lei || 0), 0),
-    [filtered]
-  );
+  const total = useMemo(() => filtered.reduce((sum, c) => sum + Number(c.suma_lei || 0), 0), [filtered])
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Cheltuieli</h1>
-          <p className="text-sm text-muted-foreground">
-            Gestionare cheltuieli (RLS + multi-tenant).
-          </p>
-        </div>
+    <AppShell
+      header={<PageHeader title="Cheltuieli" subtitle="Monitorizare costuri operationale" />}
+      fab={<Fab onClick={() => setAddOpen(true)} label="Adauga cheltuiala" />}
+      bottomBar={
+        <StickyActionBar>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-[var(--agri-text-muted)]">Total: {total.toFixed(2)} lei</p>
+          </div>
+        </StickyActionBar>
+      }
+    >
+      <div className="mx-auto w-full max-w-4xl space-y-4 py-4">
+        <Input className="agri-control h-12" placeholder="Cauta categorie..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
-        <Button
-          onClick={() => setAddOpen(true)}
-          disabled={createMutation.isPending}
-          style={{ backgroundColor: '#F16B6B', color: 'white' }}
-        >
-          Adaugă cheltuială
-        </Button>
+        {isError ? <ErrorState title="Eroare" message={(error as Error).message} /> : null}
+        {isLoading ? <LoadingState label="Se incarca cheltuielile..." /> : null}
+        {!isLoading && !isError && filtered.length === 0 ? <EmptyState title="Nu exista cheltuieli" /> : null}
+
+        {!isLoading && !isError && filtered.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((c) => (
+              <CheltuialaCard
+                key={c.id}
+                cheltuiala={c}
+                onEdit={(ch) => {
+                  setEditing(ch)
+                  setEditOpen(true)
+                }}
+                onDelete={(id) => {
+                  const target = filtered.find((item) => item.id === id) ?? null
+                  setDeleting(target)
+                }}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      {/* Filters + totals */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Căutare</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Input
-              placeholder="Caută categorie..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Sumar</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-sm">
-              <span className="text-muted-foreground">Total cheltuieli:</span>{' '}
-              <span className="font-semibold">{filtered.length}</span>
-            </div>
-            <div className="text-sm">
-              <span className="text-muted-foreground">Sumă totală:</span>{' '}
-              <span className="font-semibold">{total.toFixed(2)} lei</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Content */}
-      {isLoading && <p className="text-sm text-muted-foreground">Se încarcă...</p>}
-
-      {!isLoading && filtered.length === 0 && (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Nu există cheltuieli.
-          </CardContent>
-        </Card>
-      )}
-
-      {!isLoading && filtered.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((c) => (
-            <CheltuialaCard
-              key={c.id}
-              cheltuiala={c}
-              onEdit={(ch) => {
-                setEditing(ch);
-                setEditOpen(true);
-              }}
-              onDelete={(id, _name) => {
-                // păstrăm confirmarea simplă, fără UI nou
-                const ok = window.confirm('Sigur vrei să ștergi această cheltuială?');
-                if (ok) deleteMutation.mutate(id);
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Dialog Adăugare */}
       <AddCheltuialaDialog
         open={addOpen}
         onOpenChange={setAddOpen}
         onSubmit={async (data) => {
           await createMutation.mutateAsync({
+            client_sync_id: data.client_sync_id,
             data: data.data,
             categorie: data.categorie,
             suma_lei: data.suma_lei,
             furnizor: data.furnizor || undefined,
             descriere: data.descriere || undefined,
-          });
+          })
         }}
       />
 
-      {/* Dialog Editare */}
       <EditCheltuialaDialog
         cheltuiala={editing}
         open={editOpen}
         onOpenChange={(open) => {
-          setEditOpen(open);
-          if (!open) setEditing(null);
+          setEditOpen(open)
+          if (!open) setEditing(null)
         }}
         onSubmit={async (id, data) => {
           await updateMutation.mutateAsync({
@@ -223,9 +191,38 @@ export function CheltuialaPageClient({ initialCheltuieli }: CheltuialaPageClient
               furnizor: data.furnizor || undefined,
               descriere: data.descriere || undefined,
             },
-          });
+          })
         }}
       />
-    </div>
-  );
+
+      <AppDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null)
+        }}
+        title="Confirma stergerea"
+        footer={
+          <div className="grid grid-cols-2 gap-3">
+            <Button type="button" variant="outline" className="agri-cta" onClick={() => setDeleting(null)}>
+              Anuleaza
+            </Button>
+            <Button
+              type="button"
+              className="agri-cta bg-[var(--agri-danger)] text-white"
+              onClick={() => {
+                if (deleting) deleteMutation.mutate(deleting.id)
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              Sterge
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-[var(--agri-text-muted)]">
+          Confirmi stergerea cheltuielii <strong>{deleting?.id_cheltuiala ?? ''}</strong>?
+        </p>
+      </AppDialog>
+    </AppShell>
+  )
 }

@@ -57,7 +57,9 @@ export function AddParcelaDialog({
 
   const createMutation = useMutation({
     mutationFn: async (data: ParcelaFormData) => {
+      const idParcela = `PAR-${Date.now().toString().slice(-6)}`
       return createParcela({
+        id_parcela: idParcela,
         nume_parcela: data.nume_parcela,
         suprafata_m2: Number(data.suprafata_m2),
         soi_plantat: data.soi_plantat || undefined,

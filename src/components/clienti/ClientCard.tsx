@@ -28,9 +28,6 @@ export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
               <CardTitle className="text-lg font-semibold">
                 {client.nume_client}
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                ID: {client.id}
-              </p>
             </div>
           </div>
           

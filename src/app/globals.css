@@ -1,13 +1,105 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
-  --primary: #F16B6B;
-  --secondary: #312E3F;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+
+  --tabbar-h: 64px;
+  --app-nav-clearance: calc(var(--tabbar-h) + var(--safe-b));
+
+  --agri-bg: #f5f7f5;
+  --agri-surface: #ffffff;
+  --agri-surface-muted: #eef3ee;
+  --agri-text: #102015;
+  --agri-text-muted: #3d4a41;
+  --agri-border: #c8d4cb;
+  --agri-border-w: 1px;
+  --agri-primary: #1f8f4a;
+  --agri-primary-contrast: #ffffff;
+  --agri-danger: #c63b3b;
+
+  --agri-radius: 16px;
+  --agri-shadow: 0 10px 24px rgba(16, 32, 21, 0.14);
+  --agri-focus-ring: 0 0 0 3px rgba(31, 143, 74, 0.35);
+
+  --touch-control-h: 48px;
+  --touch-control-h-lg: 56px;
+  --space-v: 16px;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --app-nav-clearance: 0px;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: none;
 }
 
 body {
-  margin: 0;
-  padding: 0;
+  overflow: hidden;
+  background: var(--agri-bg);
+  color: var(--agri-text);
+  font-size: 16px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.agri-control {
+  min-height: var(--touch-control-h);
+  border-radius: 12px;
+  border: var(--agri-border-w) solid var(--agri-border);
+  background: var(--agri-surface);
+  color: var(--agri-text);
+  box-shadow: 0 1px 2px rgba(16, 32, 21, 0.05);
+}
+
+.agri-control:focus-visible {
+  outline: none;
+  box-shadow: var(--agri-focus-ring);
+}
+
+.agri-cta {
+  min-height: var(--touch-control-h-lg);
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.agri-card {
+  border-radius: var(--agri-radius);
+  border: var(--agri-border-w) solid var(--agri-border);
+  background: var(--agri-surface);
+  box-shadow: var(--agri-shadow);
+}
+
+.agri-muted {
+  color: var(--agri-text-muted);
+}
+
+html.high-visibility-mode {
+  --agri-bg: #eef3ee;
+  --agri-surface: #ffffff;
+  --agri-surface-muted: #d7e3d9;
+  --agri-text: #0a1a10;
+  --agri-text-muted: #1f3226;
+  --agri-border: #5d7364;
+  --agri-border-w: 2px;
+  --agri-focus-ring: 0 0 0 4px rgba(255, 193, 7, 0.6);
+  --touch-control-h: 52px;
+  --touch-control-h-lg: 60px;
+}
+
+html.high-visibility-mode body {
+  font-size: 17px;
 }

@@ -1,148 +1,220 @@
-'use client';
+﻿'use client'
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { createRecoltare } from '@/lib/supabase/queries/recoltari';
+import { useEffect, useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
+import * as z from 'zod'
 
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { AppDrawer } from '@/components/app/AppDrawer'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { trackEvent } from '@/lib/analytics/trackEvent'
+import { getCulegatori } from '@/lib/supabase/queries/culegatori'
+import { getParcele } from '@/lib/supabase/queries/parcele'
+import { createRecoltare } from '@/lib/supabase/queries/recoltari'
 
 const schema = z.object({
-  data: z.string().min(1),
-  parcela_id: z.string().min(1),
-  culegator_id: z.string().min(1),
+  data: z.string().min(1, 'Data este obligatorie'),
+  parcela_id: z.string().min(1, 'Parcela este obligatorie'),
+  culegator_id: z.string().min(1, 'Culegatorul este obligatoriu'),
   cantitate_kg: z
-    .number()
-    .refine((v) => Number.isFinite(v) && v > 0, 'Introduce cantitatea în kg'),
+    .string()
+    .trim()
+    .min(1, 'Cantitatea este obligatorie')
+    .refine((value) => Number.isFinite(Number(value)) && Number(value) > 0, {
+      message: 'Introduce cantitatea in kg',
+    }),
   observatii: z.string().optional(),
-});
+})
 
-type FormData = z.infer<typeof schema>;
+type FormData = z.infer<typeof schema>
 
-export function AddRecoltareDialog() {
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+interface AddRecoltareDialogProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  hideTrigger?: boolean
+}
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<FormData>({
+const defaultValues = (): FormData => ({
+  data: new Date().toISOString().split('T')[0],
+  parcela_id: '',
+  culegator_id: '',
+  cantitate_kg: '',
+  observatii: '',
+})
+
+export function AddRecoltareDialog({ open, onOpenChange, hideTrigger = false }: AddRecoltareDialogProps) {
+  const queryClient = useQueryClient()
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  const isControlled = typeof open === 'boolean'
+  const dialogOpen = isControlled ? open : internalOpen
+  const setDialogOpen = (nextOpen: boolean) => {
+    if (!isControlled) setInternalOpen(nextOpen)
+    onOpenChange?.(nextOpen)
+  }
+
+  const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      data: new Date().toISOString().split('T')[0],
-    },
-  });
+    defaultValues: defaultValues(),
+  })
+
+  useEffect(() => {
+    if (!dialogOpen) {
+      form.reset(defaultValues())
+    }
+  }, [dialogOpen, form])
+
+  const { data: parcele = [] } = useQuery({
+    queryKey: ['parcele'],
+    queryFn: getParcele,
+  })
+
+  const { data: culegatori = [] } = useQuery({
+    queryKey: ['culegatori'],
+    queryFn: getCulegatori,
+  })
 
   const mutation = useMutation({
     mutationFn: createRecoltare,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recoltari'] });
-      toast.success('Recoltare adăugată');
-      setOpen(false);
-      reset({ data: new Date().toISOString().split('T')[0] });
+      queryClient.invalidateQueries({ queryKey: ['recoltari'] })
+      trackEvent('create_recoltare', { source: 'AddRecoltareDialog' })
+      toast.success('Recoltare adaugata')
+      setDialogOpen(false)
     },
-    onError: () => {
-      toast.error('Eroare la salvare');
+    onError: (error: any) => {
+      const conflict = error?.status === 409 || error?.code === '23505'
+      if (conflict) {
+        toast.info('Inregistrarea era deja sincronizata.')
+        setDialogOpen(false)
+        return
+      }
+      toast.error('Eroare la salvare')
     },
-  });
+  })
 
   const onSubmit = (data: FormData) => {
+    if (mutation.isPending) return
+
     mutation.mutate({
       data: data.data,
       parcela_id: data.parcela_id,
       culegator_id: data.culegator_id,
-      cantitate_kg: data.cantitate_kg,
-      observatii: data.observatii,
-    });
-  };
+      cantitate_kg: Number(data.cantitate_kg),
+      observatii: data.observatii?.trim() || undefined,
+    })
+  }
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        className="w-full h-14 rounded-xl font-semibold"
+      {!hideTrigger ? (
+        <Button onClick={() => setDialogOpen(true)} className="h-14 w-full rounded-xl font-semibold">
+          + Recoltare
+        </Button>
+      ) : null}
+
+      <AppDrawer
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Adauga recoltare"
+        footer={
+          <div className="grid grid-cols-2 gap-3">
+            <Button type="button" variant="outline" className="agri-cta" onClick={() => setDialogOpen(false)}>
+              Anuleaza
+            </Button>
+            <Button
+              type="button"
+              className="agri-cta bg-[var(--agri-primary)] text-white hover:bg-emerald-700"
+              onClick={form.handleSubmit(onSubmit)}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salveaza'}
+            </Button>
+          </div>
+        }
       >
-        + Recoltare
-      </Button>
+        <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+          <div className="space-y-2">
+            <Label htmlFor="recoltare_data">Data</Label>
+            <Input id="recoltare_data" type="date" className="agri-control h-12" {...form.register('data')} />
+            {form.formState.errors.data ? (
+              <p className="text-xs text-red-600">{form.formState.errors.data.message}</p>
+            ) : null}
+          </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Adaugă Recoltare</DialogTitle>
-          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="recoltare_parcela">Parcela</Label>
+            <select
+              id="recoltare_parcela"
+              className="agri-control h-12 w-full px-3 text-base"
+              {...form.register('parcela_id')}
+            >
+              <option value="">Selecteaza parcela</option>
+              {parcele.map((parcela) => (
+                <option key={parcela.id} value={parcela.id}>
+                  {parcela.nume_parcela || 'Parcela'}
+                </option>
+              ))}
+            </select>
+            {form.formState.errors.parcela_id ? (
+              <p className="text-xs text-red-600">{form.formState.errors.parcela_id.message}</p>
+            ) : null}
+          </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="data">Data</Label>
-              <Input id="data" type="date" {...register('data')} />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="recoltare_culegator">Culegator</Label>
+            <select
+              id="recoltare_culegator"
+              className="agri-control h-12 w-full px-3 text-base"
+              {...form.register('culegator_id')}
+            >
+              <option value="">Selecteaza culegator</option>
+              {culegatori.map((culegator) => (
+                <option key={culegator.id} value={culegator.id}>
+                  {culegator.nume_prenume || 'Culegator'}
+                </option>
+              ))}
+            </select>
+            {form.formState.errors.culegator_id ? (
+              <p className="text-xs text-red-600">{form.formState.errors.culegator_id.message}</p>
+            ) : null}
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="parcela_id">Parcelă ID</Label>
-              <Input id="parcela_id" {...register('parcela_id')} />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="recoltare_cantitate">Cantitate (kg)</Label>
+            <Input
+              id="recoltare_cantitate"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0.01"
+              placeholder="0.00"
+              className="agri-control h-12"
+              {...form.register('cantitate_kg')}
+            />
+            {form.formState.errors.cantitate_kg ? (
+              <p className="text-xs text-red-600">{form.formState.errors.cantitate_kg.message}</p>
+            ) : null}
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="culegator_id">Culegător ID</Label>
-              <Input id="culegator_id" {...register('culegator_id')} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cantitate_kg">Cantitate (kg)</Label>
-              <Input
-                id="cantitate_kg"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                {...register('cantitate_kg', { valueAsNumber: true })}
-              />
-              {errors.cantitate_kg && (
-                <p className="text-sm text-destructive">
-                  {errors.cantitate_kg.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="observatii">Observații</Label>
-              <Textarea
-                id="observatii"
-                placeholder="Observații"
-                {...register('observatii')}
-              />
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => setOpen(false)}
-                disabled={mutation.isPending}
-              >
-                Anulează
-              </Button>
-              <Button type="submit" className="flex-1" disabled={mutation.isPending}>
-                {mutation.isPending ? 'Se salvează...' : 'Salvează'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+          <div className="space-y-2">
+            <Label htmlFor="recoltare_observatii">Observatii</Label>
+            <Textarea
+              id="recoltare_observatii"
+              rows={4}
+              placeholder="Detalii suplimentare"
+              className="agri-control w-full px-3 py-2 text-base"
+              {...form.register('observatii')}
+            />
+          </div>
+        </form>
+      </AppDrawer>
     </>
-  );
+  )
 }

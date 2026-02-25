@@ -1,43 +1,185 @@
-'use client';
+'use client'
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { useEffect } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
+import { useForm, useWatch } from 'react-hook-form'
+import { toast } from 'sonner'
+import * as z from 'zod'
 
-import { Vanzare } from '@/lib/supabase/queries/vanzari';
+import { AppDialog } from '@/components/app/AppDialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { getClienti } from '@/lib/supabase/queries/clienti'
+import { STATUS_PLATA, updateVanzare, type Vanzare } from '@/lib/supabase/queries/vanzari'
+
+const schema = z.object({
+  data: z.string().min(1, 'Data este obligatorie'),
+  client_id: z.string().optional(),
+  cantitate_kg: z
+    .string()
+    .trim()
+    .min(1, 'Cantitatea este obligatorie')
+    .refine((value) => Number.isFinite(Number(value)) && Number(value) > 0, {
+      message: 'Cantitatea trebuie sa fie mai mare ca 0',
+    }),
+  pret_lei_kg: z
+    .string()
+    .trim()
+    .min(1, 'Pretul este obligatoriu')
+    .refine((value) => Number.isFinite(Number(value)) && Number(value) > 0, {
+      message: 'Pretul trebuie sa fie mai mare ca 0',
+    }),
+  status_plata: z.string().min(1, 'Statusul este obligatoriu'),
+  observatii_ladite: z.string().optional(),
+})
+
+type EditVanzareFormData = z.infer<typeof schema>
 
 interface EditVanzareDialogProps {
-  vanzare: Vanzare | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  vanzare: Vanzare | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
-export function EditVanzareDialog({
-  vanzare,
-  open,
-  onOpenChange,
-}: EditVanzareDialogProps) {
-  if (!vanzare) return null;
+const defaults = (): EditVanzareFormData => ({
+  data: new Date().toISOString().split('T')[0],
+  client_id: '',
+  cantitate_kg: '',
+  pret_lei_kg: '',
+  status_plata: 'Platit',
+  observatii_ladite: '',
+})
+
+export function EditVanzareDialog({ vanzare, open, onOpenChange }: EditVanzareDialogProps) {
+  const queryClient = useQueryClient()
+
+  const form = useForm<EditVanzareFormData>({
+    resolver: zodResolver(schema),
+    defaultValues: defaults(),
+  })
+
+  useEffect(() => {
+    if (!open || !vanzare) return
+
+    form.reset({
+      data: vanzare.data ? new Date(vanzare.data).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      client_id: vanzare.client_id ?? '',
+      cantitate_kg: String(vanzare.cantitate_kg ?? ''),
+      pret_lei_kg: String(vanzare.pret_lei_kg ?? ''),
+      status_plata: vanzare.status_plata || 'Platit',
+      observatii_ladite: vanzare.observatii_ladite ?? '',
+    })
+  }, [open, vanzare, form])
+
+  const { data: clienti = [] } = useQuery({
+    queryKey: ['clienti'],
+    queryFn: getClienti,
+  })
+
+  const selectedClientId = useWatch({ control: form.control, name: 'client_id' }) ?? ''
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: EditVanzareFormData }) =>
+      updateVanzare(id, {
+        data: data.data,
+        client_id: data.client_id || undefined,
+        cantitate_kg: Number(data.cantitate_kg),
+        pret_lei_kg: Number(data.pret_lei_kg),
+        status_plata: data.status_plata,
+        observatii_ladite: data.observatii_ladite?.trim() || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vanzari'] })
+      toast.success('Vanzare actualizata')
+      onOpenChange(false)
+    },
+    onError: (error) => {
+      console.error('Error updating vanzare:', error)
+      toast.error('Eroare la actualizarea vanzarii')
+    },
+  })
+
+  if (!vanzare) return null
+
+  const onSubmit = (data: EditVanzareFormData) => {
+    if (updateMutation.isPending) return
+    updateMutation.mutate({ id: vanzare.id, data })
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            Editare Vânzare {vanzare.id_vanzare}
-          </DialogTitle>
-        </DialogHeader>
+    <AppDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Editeaza vanzare"
+      footer={
+        <div className="grid grid-cols-2 gap-3">
+          <Button type="button" variant="outline" className="agri-cta" onClick={() => onOpenChange(false)}>
+            Anuleaza
+          </Button>
+          <Button
+            type="button"
+            className="agri-cta bg-[var(--agri-primary)] text-white hover:bg-emerald-700"
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={updateMutation.isPending}
+          >
+            {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salveaza'}
+          </Button>
+        </div>
+      }
+    >
+      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+        <div className="space-y-2">
+          <Label htmlFor="ev_data">Data vanzarii</Label>
+          <Input id="ev_data" type="date" className="agri-control h-12" {...form.register('data')} />
+          {form.formState.errors.data ? <p className="text-xs text-red-600">{form.formState.errors.data.message}</p> : null}
+        </div>
 
         <div className="space-y-2">
-          <p><strong>Client:</strong> {vanzare.client_id}</p>
-          <p><strong>Cantitate:</strong> {vanzare.cantitate_kg}</p>
-          <p><strong>Preț unitar:</strong> {vanzare.pret_unitar_lei} lei</p>
-          <p><strong>Data:</strong> {vanzare.data}</p>
+          <Label htmlFor="ev_client">Client</Label>
+          <select id="ev_client" className="agri-control h-12 w-full px-3 text-base" value={selectedClientId} onChange={(e) => form.setValue('client_id', e.target.value, { shouldDirty: true })}>
+            <option value="">Fara client specificat</option>
+            {clienti.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.nume_client}
+              </option>
+            ))}
+          </select>
         </div>
-      </DialogContent>
-    </Dialog>
-  );
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="ev_qty">Cantitate (kg)</Label>
+            <Input id="ev_qty" type="number" inputMode="decimal" step="0.01" min="0.01" className="agri-control h-12" {...form.register('cantitate_kg')} />
+            {form.formState.errors.cantitate_kg ? <p className="text-xs text-red-600">{form.formState.errors.cantitate_kg.message}</p> : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ev_price">Pret lei/kg</Label>
+            <Input id="ev_price" type="number" inputMode="decimal" step="0.01" min="0.01" className="agri-control h-12" {...form.register('pret_lei_kg')} />
+            {form.formState.errors.pret_lei_kg ? <p className="text-xs text-red-600">{form.formState.errors.pret_lei_kg.message}</p> : null}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="ev_status">Status plata</Label>
+          <select id="ev_status" className="agri-control h-12 w-full px-3 text-base" {...form.register('status_plata')}>
+            {STATUS_PLATA.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="ev_obs">Observatii ladite</Label>
+          <Textarea id="ev_obs" rows={4} className="agri-control w-full px-3 py-2 text-base" {...form.register('observatii_ladite')} />
+        </div>
+      </form>
+    </AppDialog>
+  )
 }

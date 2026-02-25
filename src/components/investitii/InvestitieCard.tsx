@@ -45,7 +45,7 @@ export function InvestitieCard({
             {/* ID investiție + Categorie */}
             <div className="flex items-center gap-2 mb-2">
               <span className="font-semibold text-lg text-gray-900">
-                {investitie.id_investitie}
+                Investitie
               </span>
               <span
                 className={`px-2 py-1 rounded-md text-xs font-medium ${

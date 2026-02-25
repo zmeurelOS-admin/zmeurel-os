@@ -1,40 +1,51 @@
-'use client';
+'use client'
 
-import { UseFormReturn } from 'react-hook-form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { UseFormReturn } from 'react-hook-form'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/ui/select'
 
 export interface ParcelaFormData {
-  nume_parcela: string;
-  suprafata_m2: string;
-  soi_plantat?: string;
-  an_plantare: string;
-  nr_plante?: string;
-  status?: string;
-  observatii?: string;
+  nume_parcela: string
+  suprafata_m2: string
+  soi_plantat?: string
+  an_plantare: string
+  nr_plante?: string
+  status?: string
+  observatii?: string
 }
 
 interface ParcelaFormProps {
-  form: UseFormReturn<ParcelaFormData>;
-  soiuriDisponibile: string[];
+  form: UseFormReturn<ParcelaFormData>
+  soiuriDisponibile: string[]
 }
+
+export const IOS_INPUT_CLASS =
+  'h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm transition-all duration-150 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500'
+
+export const IOS_LABEL_CLASS = 'text-sm font-medium text-gray-700'
+
+export const IOS_SELECT_TRIGGER_CLASS =
+  'h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500'
 
 export function ParcelaForm({ form, soiuriDisponibile }: ParcelaFormProps) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="nume_parcela">Nume Parcelă *</Label>
+        <Label htmlFor="nume_parcela" className={IOS_LABEL_CLASS}>
+          Nume Parcela *
+        </Label>
         <Input
           id="nume_parcela"
           placeholder="ex: Parcela Nord"
+          className={IOS_INPUT_CLASS}
           {...form.register('nume_parcela')}
         />
         {form.formState.errors.nume_parcela && (
@@ -45,12 +56,17 @@ export function ParcelaForm({ form, soiuriDisponibile }: ParcelaFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="suprafata_m2">Suprafață (m²) *</Label>
+        <Label htmlFor="suprafata_m2" className={IOS_LABEL_CLASS}>
+          Suprafata (m2) *
+        </Label>
         <Input
           id="suprafata_m2"
           type="number"
+          inputMode="numeric"
+          pattern="[0-9]*"
           step="0.01"
           placeholder="0.00"
+          className={IOS_INPUT_CLASS}
           {...form.register('suprafata_m2')}
         />
         {form.formState.errors.suprafata_m2 && (
@@ -61,13 +77,15 @@ export function ParcelaForm({ form, soiuriDisponibile }: ParcelaFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="soi_plantat">Soi Plantat</Label>
+        <Label htmlFor="soi_plantat" className={IOS_LABEL_CLASS}>
+          Soi Plantat
+        </Label>
         <Select
           value={form.watch('soi_plantat')}
           onValueChange={(value) => form.setValue('soi_plantat', value)}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Selectează soi..." />
+          <SelectTrigger className={IOS_SELECT_TRIGGER_CLASS}>
+            <SelectValue placeholder="Selecteaza soi..." />
           </SelectTrigger>
           <SelectContent>
             {soiuriDisponibile.map((soi) => (
@@ -80,13 +98,18 @@ export function ParcelaForm({ form, soiuriDisponibile }: ParcelaFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="an_plantare">An Plantare *</Label>
+        <Label htmlFor="an_plantare" className={IOS_LABEL_CLASS}>
+          An Plantare *
+        </Label>
         <Input
           id="an_plantare"
           type="number"
+          inputMode="numeric"
+          pattern="[0-9]*"
           min="2000"
           max={new Date().getFullYear()}
           placeholder={String(new Date().getFullYear())}
+          className={IOS_INPUT_CLASS}
           {...form.register('an_plantare')}
         />
         {form.formState.errors.an_plantare && (
@@ -97,40 +120,50 @@ export function ParcelaForm({ form, soiuriDisponibile }: ParcelaFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="nr_plante">Număr Plante</Label>
+        <Label htmlFor="nr_plante" className={IOS_LABEL_CLASS}>
+          Numar Plante
+        </Label>
         <Input
           id="nr_plante"
           type="number"
+          inputMode="numeric"
+          pattern="[0-9]*"
           placeholder="0"
+          className={IOS_INPUT_CLASS}
           {...form.register('nr_plante')}
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="status">Status</Label>
+        <Label htmlFor="status" className={IOS_LABEL_CLASS}>
+          Status
+        </Label>
         <Select
           value={form.watch('status')}
           onValueChange={(value) => form.setValue('status', value)}
         >
-          <SelectTrigger>
+          <SelectTrigger className={IOS_SELECT_TRIGGER_CLASS}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Activ">Activ</SelectItem>
             <SelectItem value="Inactiv">Inactiv</SelectItem>
-            <SelectItem value="În Pregătire">În Pregătire</SelectItem>
+            <SelectItem value="In Pregatire">In Pregatire</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="observatii">Observații</Label>
+        <Label htmlFor="observatii" className={IOS_LABEL_CLASS}>
+          Observatii
+        </Label>
         <Textarea
           id="observatii"
           placeholder="Detalii suplimentare..."
+          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm transition-all duration-150 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500"
           {...form.register('observatii')}
         />
       </div>
     </div>
-  );
+  )
 }

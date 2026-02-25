@@ -50,7 +50,7 @@ export function VanzareButasiCard({
             {/* ID vânzare + Soi */}
             <div className="flex items-center gap-2 mb-2">
               <span className="font-semibold text-lg text-gray-900">
-                {vanzare.id_vanzare_butasi}
+                Vanzare butasi
               </span>
               <span className="px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
                 {vanzare.soi_butasi}

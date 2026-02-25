@@ -1,29 +1,22 @@
 // src/lib/supabase/queries/activitati-agricole.ts
 import { createClient } from '../client'
 
-// ===============================
-// CONSTANTS
-// ===============================
-
 export const TIPURI_ACTIVITATI = [
   'Tratament Fungicid',
   'Tratament Insecticid',
   'Tratament Erbicid',
-  'Fertilizare Organică',
-  'Fertilizare Chimică',
-  'Fertilizare Foliară',
+  'Fertilizare Organica',
+  'Fertilizare Chimica',
+  'Fertilizare Foliara',
   'Irigare',
-  'Tundere/Curățare',
+  'Tundere/Curatare',
   'Altele',
 ] as const
-
-// ===============================
-// TYPES
-// ===============================
 
 export interface ActivitateAgricola {
   id: string
   id_activitate: string
+  client_sync_id: string
   data_aplicare: string
   parcela_id: string | null
   tip_activitate: string | null
@@ -32,11 +25,17 @@ export interface ActivitateAgricola {
   timp_pauza_zile: number
   operator: string | null
   observatii: string | null
+  sync_status: string | null
+  conflict_flag: boolean | null
+  created_by: string | null
+  updated_by: string | null
   created_at: string
   updated_at: string
 }
 
 export interface CreateActivitateAgricolaInput {
+  client_sync_id?: string
+  sync_status?: string
   data_aplicare: string
   parcela_id?: string
   tip_activitate?: string
@@ -58,14 +57,9 @@ export interface UpdateActivitateAgricolaInput {
   observatii?: string
 }
 
-// ===============================
-// INTERNAL HELPERS
-// ===============================
-
 async function generateNextId(): Promise<string> {
   const supabase = createClient()
 
-  // luăm doar ID-urile care respectă formatul nou AA###
   const { data, error } = await supabase
     .from('activitati_agricole')
     .select('id_activitate')
@@ -79,7 +73,7 @@ async function generateNextId(): Promise<string> {
     return 'AA001'
   }
 
-  const lastId = data[0].id_activitate // ex: AA014
+  const lastId = data[0].id_activitate
   const numericPart = parseInt(lastId.replace('AA', ''), 10)
 
   if (Number.isNaN(numericPart)) {
@@ -90,10 +84,6 @@ async function generateNextId(): Promise<string> {
   return `AA${nextNumber.toString().padStart(3, '0')}`
 }
 
-// ===============================
-// QUERIES (RLS-FIRST)
-// ===============================
-
 export async function getActivitatiAgricole(): Promise<ActivitateAgricola[]> {
   const supabase = createClient()
 
@@ -101,7 +91,7 @@ export async function getActivitatiAgricole(): Promise<ActivitateAgricola[]> {
     .from('activitati_agricole')
     .select('*')
     .order('data_aplicare', { ascending: false })
-.order('created_at', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching activitati:', error)
@@ -111,64 +101,35 @@ export async function getActivitatiAgricole(): Promise<ActivitateAgricola[]> {
   return data ?? []
 }
 
-/**
- * CREATE ACTIVITATE AGRICOLA (RLS-FIRST)
- * 
- * 🔐 RLS REQUIREMENTS:
- * - tenant_id MUST be set automatically via BEFORE INSERT trigger OR RLS WITH CHECK policy
- * - INSERT policy must exist with WITH CHECK validating tenant_id matches current user's tenant
- * 
- * 📋 DB SCHEMA EXPECTATIONS:
- * - tenant_id: NOT NULL (required)
- * - tenant_id: No DEFAULT value (set via trigger)
- * 
- * 🔧 REQUIRED TRIGGER (if not using RLS WITH CHECK to set):
- * CREATE FUNCTION set_tenant_id_activitati()
- * RETURNS trigger AS $$
- * BEGIN
- *   NEW.tenant_id := (
- *     SELECT id FROM tenants
- *     WHERE owner_user_id = auth.uid()
- *   );
- *   RETURN NEW;
- * END;
- * $$ LANGUAGE plpgsql;
- * 
- * CREATE TRIGGER set_tenant_before_insert_activitati
- * BEFORE INSERT ON activitati_agricole
- * FOR EACH ROW EXECUTE FUNCTION set_tenant_id_activitati();
- * 
- * 🔒 REQUIRED RLS POLICY:
- * CREATE POLICY tenant_isolation_insert_activitati
- * ON activitati_agricole
- * FOR INSERT
- * WITH CHECK (
- *   tenant_id = (
- *     SELECT id FROM tenants
- *     WHERE owner_user_id = auth.uid()
- *   )
- * );
- */
 export async function createActivitateAgricola(
   input: CreateActivitateAgricolaInput
 ): Promise<ActivitateAgricola> {
   const supabase = createClient()
   const nextId = await generateNextId()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const { data, error } = await supabase
     .from('activitati_agricole')
-    .insert({
-      id_activitate: nextId,
-      data_aplicare: input.data_aplicare,
-      parcela_id: input.parcela_id ?? null,
-      tip_activitate: input.tip_activitate ?? null,
-      produs_utilizat: input.produs_utilizat ?? null,
-      doza: input.doza ?? null,
-      timp_pauza_zile: input.timp_pauza_zile ?? 0,
-      operator: input.operator ?? null,
-      observatii: input.observatii ?? null,
-      // tenant_id is NOT included - must be set by trigger or RLS policy
-    })
+    .upsert(
+      {
+        client_sync_id: input.client_sync_id ?? crypto.randomUUID(),
+        id_activitate: nextId,
+        data_aplicare: input.data_aplicare,
+        parcela_id: input.parcela_id ?? null,
+        tip_activitate: input.tip_activitate ?? null,
+        produs_utilizat: input.produs_utilizat ?? null,
+        doza: input.doza ?? null,
+        timp_pauza_zile: input.timp_pauza_zile ?? 0,
+        operator: input.operator ?? null,
+        observatii: input.observatii ?? null,
+        sync_status: input.sync_status ?? 'synced',
+        created_by: user?.id ?? null,
+        updated_by: user?.id ?? null,
+      },
+      { onConflict: 'client_sync_id' }
+    )
     .select()
     .single()
 
@@ -218,16 +179,12 @@ export async function deleteActivitateAgricola(id: string): Promise<void> {
   }
 }
 
-// ===============================
-// DOMAIN LOGIC
-// ===============================
-
 export function calculatePauseStatus(
   dataAplicare: string,
   timpPauzaZile: number
 ): {
   dataRecoltarePermisa: string
-  status: 'OK' | 'Pauză'
+  status: 'OK' | 'Pauza'
 } {
   const aplicareDate = new Date(dataAplicare)
   const recoltareDate = new Date(aplicareDate)
@@ -238,6 +195,6 @@ export function calculatePauseStatus(
 
   return {
     dataRecoltarePermisa: recoltareDate.toISOString().split('T')[0],
-    status: today >= recoltareDate ? 'OK' : 'Pauză',
+    status: today >= recoltareDate ? 'OK' : 'Pauza',
   }
 }

@@ -1,27 +1,18 @@
 import { Sidebar } from '@/components/layout/Sidebar'
-import { MobileShell } from '@/components/mobile/MobileShell'
+import { BottomTabBar } from '@/components/app/BottomTabBar'
 import { Providers } from '../providers'
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <Providers>
-      {/* Desktop */}
-      <div className="hidden lg:flex min-h-screen">
+      <div className="hidden min-h-screen lg:flex">
         <Sidebar />
-        <main className="flex-1 lg:ml-64 overflow-y-auto">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto lg:ml-64">{children}</main>
       </div>
 
-      {/* Mobile */}
-      <div className="lg:hidden">
-        <MobileShell>
-          {children}
-        </MobileShell>
+      <div className="relative h-[100dvh] min-h-[100svh] overflow-hidden lg:hidden">
+        {children}
+        <BottomTabBar />
       </div>
     </Providers>
   )

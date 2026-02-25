@@ -1,4 +1,4 @@
-// src/components/investitii/EditInvestitieDialog.tsx
+﻿// src/components/investitii/EditInvestitieDialog.tsx
 'use client'
 
 import { useEffect } from 'react'
@@ -103,12 +103,12 @@ export function EditInvestitieDialog({
     }) => updateInvestitie(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investitii'] })
-      toast.success('Investiție actualizată cu succes!')
+      toast.success('InvestiČ›ie actualizatÄ cu succes!')
       onOpenChange(false)
     },
     onError: (error) => {
       console.error('Error updating investitie:', error)
-      toast.error('Eroare la actualizarea investiției')
+      toast.error('Eroare la actualizarea investiČ›iei')
     },
   })
 
@@ -135,7 +135,7 @@ export function EditInvestitieDialog({
       <DialogContent className="max-w-md bg-white">
         <DialogHeader>
           <DialogTitle>
-            Editează Investiție: {investitie.id_investitie}
+            Editeaza investitie
           </DialogTitle>
         </DialogHeader>
 
@@ -151,7 +151,7 @@ export function EditInvestitieDialog({
               {...register('categorie')}
               className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
             >
-              <option value="">Selectează categoria...</option>
+              <option value="">SelecteazÄ categoria...</option>
               {CATEGORII_INVESTITII.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
@@ -161,22 +161,22 @@ export function EditInvestitieDialog({
           </div>
 
           <div>
-            <Label>Parcelă</Label>
+            <Label>ParcelÄ</Label>
             <select
               {...register('parcela_id')}
               className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
             >
-              <option value="">Fără legătură cu parcelă</option>
+              <option value="">FÄrÄ legÄturÄ cu parcelÄ</option>
               {parcele.map((parcela: any) => (
                 <option key={parcela.id} value={parcela.id}>
-                  {parcela.id_parcela} - {parcela.nume_parcela}
+                  {parcela.nume_parcela || 'Parcela'}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <Label>Sumă (lei)</Label>
+            <Label>SumÄ (lei)</Label>
             <Input type="number" step="0.01" {...register('suma_lei')} />
           </div>
 
@@ -196,7 +196,7 @@ export function EditInvestitieDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Anulează
+              AnuleazÄ
             </Button>
             <Button
               type="submit"
@@ -204,8 +204,8 @@ export function EditInvestitieDialog({
               className="bg-[#F16B6B] hover:bg-[#E05A5A]"
             >
               {updateMutation.isPending
-                ? 'Se salvează...'
-                : 'Salvează'}
+                ? 'Se salveazÄ...'
+                : 'SalveazÄ'}
             </Button>
           </div>
         </form>
