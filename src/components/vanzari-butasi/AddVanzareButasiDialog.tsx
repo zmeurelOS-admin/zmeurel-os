@@ -1,10 +1,11 @@
-﻿'use client'
+'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import * as Sentry from '@sentry/nextjs'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
-import { useForm } from 'react-hook-form'
+import { CalendarDays, Loader2, Minus, Plus, Trash2 } from 'lucide-react'
+import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
@@ -12,34 +13,55 @@ import { AppDrawer } from '@/components/app/AppDrawer'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 import { getClienti } from '@/lib/supabase/queries/clienti'
 import { getParcele } from '@/lib/supabase/queries/parcele'
-import { createVanzareButasi } from '@/lib/supabase/queries/vanzari-butasi'
+import {
+  VANZARE_BUTASI_STATUSES,
+  type VanzareButasiStatus,
+  createVanzareButasi,
+} from '@/lib/supabase/queries/vanzari-butasi'
+import { cn } from '@/lib/utils'
 
-const vanzareButasiSchema = z.object({
-  data: z.string().min(1, 'Data este obligatorie'),
+const statusLabels: Record<VanzareButasiStatus, string> = {
+  noua: 'Noua',
+  confirmata: 'Confirmata',
+  pregatita: 'Pregatita',
+  livrata: 'Livrata',
+  anulata: 'Anulata',
+}
+
+const schema = z.object({
   client_id: z.string().optional(),
   parcela_sursa_id: z.string().optional(),
-  soi_butasi: z.string().min(1, 'Soiul este obligatoriu'),
-  cantitate_butasi: z
-    .string()
-    .trim()
-    .min(1, 'Cantitatea este obligatorie')
-    .refine((value) => Number.isFinite(Number(value)) && Number(value) > 0, {
-      message: 'Cantitatea trebuie sa fie mai mare ca 0',
-    }),
-  pret_unitar_lei: z
-    .string()
-    .trim()
-    .min(1, 'Pretul este obligatoriu')
-    .refine((value) => Number.isFinite(Number(value)) && Number(value) > 0, {
-      message: 'Pretul trebuie sa fie mai mare ca 0',
-    }),
+  status: z.enum(VANZARE_BUTASI_STATUSES),
+  data_comanda: z.string().min(1, 'Data comenzii este obligatorie'),
+  data_livrare_estimata: z.string().optional(),
+  adresa_livrare: z.string().optional(),
   observatii: z.string().optional(),
+  avans_suma: z.coerce.number().min(0, 'Avansul nu poate fi negativ'),
+  avans_data: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        soi: z.string().trim().min(1, 'Soiul este obligatoriu'),
+        cantitate: z.coerce.number().int().min(1, 'Cantitatea trebuie sa fie > 0'),
+        pret_unitar: z.coerce.number().gt(0, 'Pretul trebuie sa fie > 0'),
+      })
+    )
+    .min(1, 'Adauga cel putin un produs'),
 })
 
-type VanzareButasiFormData = z.infer<typeof vanzareButasiSchema>
+type FormValues = z.input<typeof schema>
+type SubmitValues = z.output<typeof schema>
 
 interface AddVanzareButasiDialogProps {
   open?: boolean
@@ -47,17 +69,45 @@ interface AddVanzareButasiDialogProps {
   hideTrigger?: boolean
 }
 
-const defaults = (): VanzareButasiFormData => ({
-  data: new Date().toISOString().split('T')[0],
+const defaultValues = (): FormValues => ({
   client_id: '',
   parcela_sursa_id: '',
-  soi_butasi: '',
-  cantitate_butasi: '',
-  pret_unitar_lei: '',
+  status: 'noua',
+  data_comanda: new Date().toISOString().split('T')[0],
+  data_livrare_estimata: '',
+  adresa_livrare: '',
   observatii: '',
+  avans_suma: 0,
+  avans_data: '',
+  items: [{ soi: '', cantitate: 1, pret_unitar: 0 }],
 })
 
-export function AddVanzareButasiDialog({ open, onOpenChange, hideTrigger = false }: AddVanzareButasiDialogProps) {
+function formatLei(value: number): string {
+  return `${value.toFixed(2)} lei`
+}
+
+function resolveErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  const maybeError = (error ?? {}) as { message?: string; details?: string; hint?: string }
+  return maybeError.message || maybeError.details || maybeError.hint || 'Eroare la salvarea comenzii'
+}
+
+function isSchemaCacheError(error: unknown): boolean {
+  const maybeError = (error ?? {}) as { code?: string; message?: string }
+  const message = (maybeError.message ?? '').toLowerCase()
+  return (
+    maybeError.code === 'PGRST204' ||
+    maybeError.code === '42703' ||
+    message.includes('schema cache') ||
+    message.includes('could not find the')
+  )
+}
+
+export function AddVanzareButasiDialog({
+  open,
+  onOpenChange,
+  hideTrigger = false,
+}: AddVanzareButasiDialogProps) {
   const queryClient = useQueryClient()
   const [internalOpen, setInternalOpen] = useState(false)
 
@@ -68,13 +118,20 @@ export function AddVanzareButasiDialog({ open, onOpenChange, hideTrigger = false
     onOpenChange?.(nextOpen)
   }
 
-  const form = useForm<VanzareButasiFormData>({
-    resolver: zodResolver(vanzareButasiSchema),
-    defaultValues: defaults(),
+  const form = useForm<FormValues, unknown, SubmitValues>({
+    resolver: zodResolver(schema),
+    defaultValues: defaultValues(),
+  })
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'items',
   })
 
   useEffect(() => {
-    if (!dialogOpen) form.reset(defaults())
+    if (!dialogOpen) {
+      form.reset(defaultValues())
+    }
   }, [dialogOpen, form])
 
   const { data: clienti = [] } = useQuery({
@@ -87,30 +144,77 @@ export function AddVanzareButasiDialog({ open, onOpenChange, hideTrigger = false
     queryFn: getParcele,
   })
 
-  const createMutation = useMutation({
+  const watchedItems = form.watch('items')
+  const avans = Number(form.watch('avans_suma') ?? 0)
+
+  const totalProduse = useMemo(
+    () => watchedItems.reduce((sum, item) => sum + Number(item.cantitate || 0) * Number(item.pret_unitar || 0), 0),
+    [watchedItems]
+  )
+
+  const restDeIncasat = totalProduse - (Number.isFinite(avans) ? avans : 0)
+
+  const mutation = useMutation({
     mutationFn: createVanzareButasi,
-    onSuccess: () => {
+    onSuccess: (savedOrder) => {
       queryClient.invalidateQueries({ queryKey: ['vanzari-butasi'] })
-      toast.success('Vanzare butasi adaugata')
+      trackEvent('butasi_order_created', 'vanzari-butasi', {
+        orderId: savedOrder.id,
+        status: savedOrder.status,
+        total: savedOrder.total_lei,
+      })
+      Sentry.captureMessage('butasi_order_created', {
+        level: 'info',
+        tags: { module: 'vanzari-butasi' },
+        extra: { orderId: savedOrder.id, status: savedOrder.status, total: savedOrder.total_lei },
+      })
+      toast.success('Comanda a fost salvata')
       setDialogOpen(false)
     },
-    onError: (error) => {
-      console.error('Error creating vanzare butasi:', error)
-      toast.error('Eroare la adaugarea vanzarii')
+    onError: (error: unknown) => {
+      const maybeError = (error ?? {}) as { code?: string; message?: string; details?: string; hint?: string }
+      console.error('Error creating butasi order:', {
+        message: maybeError?.message,
+        code: maybeError?.code,
+        details: maybeError?.details,
+        hint: maybeError?.hint,
+      })
+      Sentry.captureException(error, {
+        tags: { module: 'vanzari-butasi', action: 'create_order' },
+        extra: {
+          code: maybeError?.code,
+          details: maybeError?.details,
+          hint: maybeError?.hint,
+        },
+      })
+
+      if (isSchemaCacheError(error)) {
+        toast.error('Schema DB nu e sincronizata. Reincarca aplicatia sau ruleaza reload schema in Supabase.')
+        return
+      }
+
+      toast.error(resolveErrorMessage(error))
     },
   })
 
-  const onSubmit = (data: VanzareButasiFormData) => {
-    if (createMutation.isPending) return
+  const onSubmit = (values: SubmitValues) => {
+    if (mutation.isPending) return
 
-    createMutation.mutate({
-      data: data.data,
-      client_id: data.client_id || undefined,
-      parcela_sursa_id: data.parcela_sursa_id || undefined,
-      soi_butasi: data.soi_butasi,
-      cantitate_butasi: Number(data.cantitate_butasi),
-      pret_unitar_lei: Number(data.pret_unitar_lei),
-      observatii: data.observatii?.trim() || undefined,
+    mutation.mutate({
+      client_id: values.client_id || null,
+      parcela_sursa_id: values.parcela_sursa_id || null,
+      status: values.status,
+      data_comanda: values.data_comanda,
+      data_livrare_estimata: values.data_livrare_estimata || null,
+      adresa_livrare: values.adresa_livrare?.trim() || null,
+      observatii: values.observatii?.trim() || null,
+      avans_suma: Number(values.avans_suma),
+      avans_data: values.avans_data || null,
+      items: values.items.map((item) => ({
+        soi: item.soi.trim(),
+        cantitate: Number(item.cantitate),
+        pret_unitar: Number(item.pret_unitar),
+      })),
     })
   }
 
@@ -118,83 +222,258 @@ export function AddVanzareButasiDialog({ open, onOpenChange, hideTrigger = false
     <>
       {!hideTrigger ? (
         <Button type="button" className="h-14 w-full rounded-xl font-semibold" onClick={() => setDialogOpen(true)}>
-          + Vanzare butasi
+          + Comanda butasi
         </Button>
       ) : null}
 
       <AppDrawer
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        title="Adauga vanzare butasi"
+        title="Adauga comanda butasi"
         footer={
-          <div className="grid grid-cols-2 gap-3">
-            <Button type="button" variant="outline" className="agri-cta" onClick={() => setDialogOpen(false)}>
-              Anuleaza
-            </Button>
-            <Button
-              type="button"
-              className="agri-cta bg-[var(--agri-primary)] text-white hover:bg-emerald-700"
-              onClick={form.handleSubmit(onSubmit)}
-              disabled={createMutation.isPending}
-            >
-              {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salveaza'}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            className="agri-cta w-full bg-[var(--agri-primary)] text-white hover:bg-emerald-700"
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salveaza comanda'}
+          </Button>
         }
       >
-        <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="space-y-2">
-            <Label htmlFor="vb_data">Data</Label>
-            <Input id="vb_data" type="date" className="agri-control h-12" {...form.register('data')} />
-            {form.formState.errors.data ? <p className="text-xs text-red-600">{form.formState.errors.data.message}</p> : null}
-          </div>
+        <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
+          <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Client</Label>
+                <Controller
+                  control={form.control}
+                  name="client_id"
+                  render={({ field }) => (
+                    <Select value={field.value || '__none'} onValueChange={(value) => field.onChange(value === '__none' ? '' : value)}>
+                      <SelectTrigger className="agri-control h-12">
+                        <SelectValue placeholder="Selecteaza client" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">Fara client</SelectItem>
+                        {clienti.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.nume_client}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="vb_soi">Soi butasi</Label>
-            <Input id="vb_soi" className="agri-control h-12" placeholder="Ex: Delniwa" {...form.register('soi_butasi')} />
-            {form.formState.errors.soi_butasi ? <p className="text-xs text-red-600">{form.formState.errors.soi_butasi.message}</p> : null}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="vb_qty">Cantitate</Label>
-              <Input id="vb_qty" type="number" min="1" className="agri-control h-12" {...form.register('cantitate_butasi')} />
-              {form.formState.errors.cantitate_butasi ? <p className="text-xs text-red-600">{form.formState.errors.cantitate_butasi.message}</p> : null}
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  {VANZARE_BUTASI_STATUSES.map((status) => {
+                    const isActive = form.watch('status') === status
+                    return (
+                      <Button
+                        key={status}
+                        type="button"
+                        variant="outline"
+                        onClick={() => form.setValue('status', status, { shouldDirty: true })}
+                        className={cn(
+                          'h-10 rounded-full border text-xs font-semibold',
+                          isActive && status !== 'anulata' && 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700',
+                          isActive && status === 'anulata' && 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200',
+                          !isActive && 'bg-white text-slate-600'
+                        )}
+                      >
+                        {statusLabels[status]}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="vb_price">Pret/buc (lei)</Label>
-              <Input id="vb_price" type="number" step="0.01" min="0.01" className="agri-control h-12" {...form.register('pret_unitar_lei')} />
-              {form.formState.errors.pret_unitar_lei ? <p className="text-xs text-red-600">{form.formState.errors.pret_unitar_lei.message}</p> : null}
+          </div>
+
+          <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="vb_data_comanda">Data comanda</Label>
+                <div className="relative">
+                  <CalendarDays className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input id="vb_data_comanda" type="date" className="agri-control h-12 pl-10" {...form.register('data_comanda')} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vb_data_livrare">Data preconizata livrare</Label>
+                <div className="relative">
+                  <CalendarDays className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input id="vb_data_livrare" type="date" className="agri-control h-12 pl-10" {...form.register('data_livrare_estimata')} />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="vb_client">Client</Label>
-            <select id="vb_client" className="agri-control h-12 w-full px-3 text-base" {...form.register('client_id')}>
-              <option value="">Fara client</option>
-              {clienti.map((client: any) => (
-                <option key={client.id} value={client.id}>
-                  {client.nume_client}
-                </option>
-              ))}
-            </select>
+          <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="vb_adresa">Adresa livrare</Label>
+                <Input id="vb_adresa" className="agri-control h-12" placeholder="Strada, numar, localitate" {...form.register('adresa_livrare')} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="vb_obs">Observatii</Label>
+                <Textarea id="vb_obs" rows={4} className="agri-control" {...form.register('observatii')} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Parcela sursa</Label>
+                <Controller
+                  control={form.control}
+                  name="parcela_sursa_id"
+                  render={({ field }) => (
+                    <Select value={field.value || '__none'} onValueChange={(value) => field.onChange(value === '__none' ? '' : value)}>
+                      <SelectTrigger className="agri-control h-12">
+                        <SelectValue placeholder="Selecteaza parcela" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">Fara parcela</SelectItem>
+                        {parcele.map((parcela) => (
+                          <SelectItem key={parcela.id} value={parcela.id}>
+                            {parcela.nume_parcela}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="vb_parcela">Parcela sursa</Label>
-            <select id="vb_parcela" className="agri-control h-12 w-full px-3 text-base" {...form.register('parcela_sursa_id')}>
-              <option value="">Fara parcela</option>
-              {parcele.map((parcela: any) => (
-                <option key={parcela.id} value={parcela.id}>
-                  {parcela.nume_parcela}
-                </option>
-              ))}
-            </select>
+          <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-[var(--agri-text)]">Produse</h3>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => append({ soi: '', cantitate: 1, pret_unitar: 0 })}
+              >
+                + Adauga soi
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {fields.map((field, index) => {
+                const cantitate = Number(watchedItems[index]?.cantitate || 0)
+                const pret = Number(watchedItems[index]?.pret_unitar || 0)
+                const subtotal = cantitate * pret
+
+                return (
+                  <div key={field.id} className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+                    <div className="grid gap-3 md:grid-cols-12">
+                      <div className="space-y-2 md:col-span-4">
+                        <Label>Soi</Label>
+                        <Input className="agri-control h-11" {...form.register(`items.${index}.soi`)} />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-3">
+                        <Label>Cantitate</Label>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-10 w-10 rounded-full"
+                            onClick={() => {
+                              const nextValue = Math.max(1, cantitate - 1)
+                              form.setValue(`items.${index}.cantitate`, nextValue, { shouldValidate: true })
+                            }}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <Input
+                            type="number"
+                            min={1}
+                            className="agri-control h-11 text-center"
+                            {...form.register(`items.${index}.cantitate`, { valueAsNumber: true })}
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-10 w-10 rounded-full"
+                            onClick={() => form.setValue(`items.${index}.cantitate`, cantitate + 1, { shouldValidate: true })}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 md:col-span-3">
+                        <Label>Pret/buc</Label>
+                        <Input
+                          type="number"
+                          min={0.01}
+                          step="0.01"
+                          className="agri-control h-11"
+                          {...form.register(`items.${index}.pret_unitar`, { valueAsNumber: true })}
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Total linie</Label>
+                        <div className="flex h-11 items-center justify-between rounded-xl border border-emerald-100 bg-white px-3 text-sm font-semibold">
+                          {formatLei(subtotal || 0)}
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 rounded-full text-red-600 hover:bg-red-100"
+                            onClick={() => {
+                              if (fields.length > 1) {
+                                remove(index)
+                              }
+                            }}
+                            disabled={fields.length === 1}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="vb_obs">Observatii</Label>
-            <Textarea id="vb_obs" rows={4} className="agri-control w-full px-3 py-2 text-base" {...form.register('observatii')} />
+          <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+            <div className="space-y-3">
+              <p className="text-lg font-bold text-[var(--agri-text)]">Total produse: {formatLei(totalProduse || 0)}</p>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="vb_avans">Avans platit</Label>
+                  <Input
+                    id="vb_avans"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="agri-control h-12"
+                    {...form.register('avans_suma', { valueAsNumber: true })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vb_avans_data">Data avans</Label>
+                  <Input id="vb_avans_data" type="date" className="agri-control h-12" {...form.register('avans_data')} />
+                </div>
+              </div>
+
+              <div className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
+                Rest de incasat: {formatLei(restDeIncasat || 0)}
+              </div>
+            </div>
           </div>
         </form>
       </AppDrawer>

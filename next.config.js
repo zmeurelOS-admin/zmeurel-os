@@ -1,6 +1,15 @@
-import type { NextConfig } from 'next'
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: true,
+})
+const { withSentryConfig } = require('@sentry/nextjs')
 
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  turbopack: {},
   async headers() {
     return [
       {
@@ -25,4 +34,6 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+module.exports = withSentryConfig(withPWA(nextConfig), {
+  silent: true,
+})

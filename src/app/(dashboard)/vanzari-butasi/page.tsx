@@ -10,8 +10,38 @@ export default async function VanzariButasiPage() {
   // RLS handles tenant isolation automatically - no manual auth check needed (middleware handles it)
   const { data: vanzariButasi } = await supabase
     .from('vanzari_butasi')
-    .select('*')
-    .order('data', { ascending: false })
+    .select(`
+      id,
+      id_vanzare_butasi,
+      data,
+      data_comanda,
+      data_livrare_estimata,
+      status,
+      client_id,
+      parcela_sursa_id,
+      adresa_livrare,
+      avans_suma,
+      avans_data,
+      total_lei,
+      soi_butasi,
+      cantitate_butasi,
+      pret_unitar_lei,
+      observatii,
+      created_at,
+      updated_at,
+      tenant_id,
+      vanzari_butasi_items (
+        id,
+        tenant_id,
+        comanda_id,
+        soi,
+        cantitate,
+        pret_unitar,
+        subtotal,
+        created_at
+      )
+    `)
+    .order('data_comanda', { ascending: false })
 
   const { data: clienti } = await supabase
     .from('clienti')
@@ -22,7 +52,7 @@ export default async function VanzariButasiPage() {
     .select('id, id_parcela, nume_parcela')
 
   // Type-safe fallback pentru null
-  const safeVanzari: VanzareButasi[] = vanzariButasi ?? []
+  const safeVanzari: VanzareButasi[] = (vanzariButasi ?? []) as unknown as VanzareButasi[]
   const safeClienti = clienti ?? []
   const safeParcele = parcele ?? []
 
@@ -34,3 +64,4 @@ export default async function VanzariButasiPage() {
     />
   )
 }
+

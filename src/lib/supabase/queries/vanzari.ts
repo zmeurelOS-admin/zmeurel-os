@@ -1,5 +1,5 @@
 // src/lib/supabase/queries/vanzari.ts
-import { createClient } from '../client';
+import { getSupabase } from '../client';
 
 // Constants
 export const STATUS_PLATA = ['Platit', 'Restanta', 'Avans'] as const;
@@ -43,8 +43,53 @@ export interface UpdateVanzareInput {
   observatii_ladite?: string;
 }
 
+type SupabaseLikeError = {
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+};
+
+const isMissingColumnError = (error: SupabaseLikeError, column: string) =>
+  error?.code === 'PGRST204' || error?.message?.includes(`'${column}'`);
+
+const shouldFallbackToLegacyInsert = (error: unknown) => {
+  const e = (error ?? {}) as SupabaseLikeError;
+  const message = (e.message ?? '').toLowerCase();
+  const code = e.code ?? '';
+
+  if (!e || (Object.keys(e).length === 0 && e.constructor === Object)) return true;
+
+  return (
+    code === 'PGRST204' || // missing column in PostgREST schema cache
+    code === '42703' || // undefined column
+    code === '42P10' || // invalid ON CONFLICT target
+    isMissingColumnError(e, 'client_sync_id') ||
+    isMissingColumnError(e, 'sync_status') ||
+    isMissingColumnError(e, 'created_by') ||
+    isMissingColumnError(e, 'updated_by') ||
+    message.includes('client_sync_id') ||
+    message.includes('on conflict')
+  );
+};
+
+const toReadableError = (error: unknown, fallbackMessage: string) => {
+  const e = (error ?? {}) as SupabaseLikeError;
+  const message =
+    e?.message ||
+    e?.details ||
+    e?.hint ||
+    fallbackMessage;
+
+  return Object.assign(new Error(message), {
+    code: e?.code,
+    details: e?.details,
+    hint: e?.hint,
+  });
+};
+
 async function generateNextId(): Promise<string> {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   const { data, error } = await supabase
     .from('vanzari')
@@ -74,11 +119,11 @@ async function generateNextId(): Promise<string> {
 }
 
 export async function getVanzari(): Promise<Vanzare[]> {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   const { data, error } = await supabase
     .from('vanzari')
-    .select('*')
+    .select('id,id_vanzare,data,client_id,cantitate_kg,pret_lei_kg,status_plata,observatii_ladite,created_at,updated_at,tenant_id')
     .order('data', { ascending: false });
 
   if (error) {
@@ -86,47 +131,83 @@ export async function getVanzari(): Promise<Vanzare[]> {
     throw error;
   }
 
-  return data || [];
+  return (data ?? []) as unknown as Vanzare[];
 }
 
 export async function createVanzare(input: CreateVanzareInput): Promise<Vanzare> {
-  const supabase = createClient();
+  const supabase = getSupabase();
   const nextId = await generateNextId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const payloadWithSync = {
+    client_sync_id: input.client_sync_id ?? crypto.randomUUID(),
+    id_vanzare: nextId,
+    data: input.data,
+    client_id: input.client_id || null,
+    cantitate_kg: input.cantitate_kg,
+    pret_lei_kg: input.pret_lei_kg,
+    status_plata: input.status_plata || 'Platit',
+    observatii_ladite: input.observatii_ladite || null,
+    sync_status: input.sync_status ?? 'synced',
+    created_by: user?.id ?? null,
+    updated_by: user?.id ?? null,
+  };
+
   const { data, error } = await supabase
     .from('vanzari')
-    .upsert(
-      {
-        client_sync_id: input.client_sync_id ?? crypto.randomUUID(),
-        id_vanzare: nextId,
-        data: input.data,
-        client_id: input.client_id || null,
-        cantitate_kg: input.cantitate_kg,
-        pret_lei_kg: input.pret_lei_kg,
-        status_plata: input.status_plata || 'Platit',
-        observatii_ladite: input.observatii_ladite || null,
-        sync_status: input.sync_status ?? 'synced',
-        created_by: user?.id ?? null,
-        updated_by: user?.id ?? null,
-      },
-      { onConflict: 'client_sync_id' }
-    )
+    .upsert(payloadWithSync, { onConflict: 'client_sync_id' })
     .select()
     .single();
 
-  if (error) {
-    console.error('Error creating vanzare:', error);
-    throw error;
+  if (!error) {
+    return data as unknown as Vanzare;
   }
 
-  return data;
+  if (shouldFallbackToLegacyInsert(error)) {
+    const payloadLegacy = {
+      id_vanzare: nextId,
+      data: input.data,
+      client_id: input.client_id || null,
+      cantitate_kg: input.cantitate_kg,
+      pret_lei_kg: input.pret_lei_kg,
+      status_plata: input.status_plata || 'Platit',
+      observatii_ladite: input.observatii_ladite || null,
+    };
+
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('vanzari')
+      .insert(payloadLegacy)
+      .select()
+      .single();
+
+    if (fallbackError) {
+      console.error('Error creating vanzare (fallback):', {
+        message: fallbackError.message,
+        code: fallbackError.code,
+        details: fallbackError.details,
+        hint: fallbackError.hint,
+      });
+      throw toReadableError(fallbackError, 'Nu am putut salva vanzarea.')
+    }
+
+    return fallbackData as unknown as Vanzare;
+  }
+
+  const maybeError = error as SupabaseLikeError;
+  console.error('Error creating vanzare:', {
+    message: maybeError?.message,
+    code: maybeError?.code,
+    details: maybeError?.details,
+    hint: maybeError?.hint,
+  });
+  throw toReadableError(error, 'Nu am putut salva vanzarea.');
+
 }
 
 export async function updateVanzare(id: string, input: UpdateVanzareInput): Promise<Vanzare> {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   const { data, error } = await supabase
     .from('vanzari')
@@ -143,11 +224,11 @@ export async function updateVanzare(id: string, input: UpdateVanzareInput): Prom
     throw error;
   }
 
-  return data;
+  return data as unknown as Vanzare;
 }
 
 export async function deleteVanzare(id: string): Promise<void> {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   const { error } = await supabase.from('vanzari').delete().eq('id', id);
 
@@ -156,3 +237,5 @@ export async function deleteVanzare(id: string): Promise<void> {
     throw error;
   }
 }
+
+

@@ -1,6 +1,7 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   CalendarClock,
   Coins,
@@ -9,6 +10,7 @@ import {
   Sprout,
   Tractor,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { AppShell } from '@/components/app/AppShell'
 import { AlertCard } from '@/components/app/AlertCard'
@@ -19,6 +21,13 @@ import { LoadingState } from '@/components/app/LoadingState'
 import { PageHeader } from '@/components/app/PageHeader'
 import { ProfitSummaryCard } from '@/components/app/ProfitSummaryCard'
 import { generateSmartAlerts } from '@/lib/alerts/engine'
+import { trackEvent } from '@/lib/analytics/trackEvent'
+import {
+  dismissAlert,
+  dismissAlertsBulk,
+  getAlertContext,
+  getTodayDismissals,
+} from '@/lib/supabase/queries/alertDismissals'
 import { getActivitatiAgricole } from '@/lib/supabase/queries/activitati-agricole'
 import { getCheltuieli } from '@/lib/supabase/queries/cheltuieli'
 import { getParcele } from '@/lib/supabase/queries/parcele'
@@ -37,6 +46,20 @@ function formatCurrency(value: number) {
 }
 
 export default function DashboardPage() {
+  const [enableSecondaryQueries, setEnableSecondaryQueries] = useState(false)
+  const [optimisticDismissedKeys, setOptimisticDismissedKeys] = useState<Set<string>>(new Set())
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    trackEvent('open_dashboard', 'dashboard')
+
+    const timer = window.setTimeout(() => {
+      setEnableSecondaryQueries(true)
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [])
+
   const recoltariQuery = useQuery({
     queryKey: ['dashboard', 'recoltari'],
     queryFn: getRecoltari,
@@ -45,29 +68,33 @@ export default function DashboardPage() {
   const parceleQuery = useQuery({
     queryKey: ['dashboard', 'parcele'],
     queryFn: getParcele,
+    enabled: enableSecondaryQueries,
   })
 
   const activitatiQuery = useQuery({
     queryKey: ['dashboard', 'activitati'],
     queryFn: getActivitatiAgricole,
+    enabled: enableSecondaryQueries,
   })
 
   const vanzariQuery = useQuery({
     queryKey: ['dashboard', 'vanzari'],
     queryFn: getVanzari,
+    enabled: enableSecondaryQueries,
   })
 
   const cheltuieliQuery = useQuery({
     queryKey: ['dashboard', 'cheltuieli'],
     queryFn: getCheltuieli,
+    enabled: enableSecondaryQueries,
   })
 
-  const isLoading =
-    recoltariQuery.isLoading ||
-    parceleQuery.isLoading ||
-    activitatiQuery.isLoading ||
-    vanzariQuery.isLoading ||
-    cheltuieliQuery.isLoading
+  const alertContextQuery = useQuery({
+    queryKey: ['dashboard', 'alert-context'],
+    queryFn: getAlertContext,
+  })
+
+  const isLoading = recoltariQuery.isLoading
   const hasError =
     recoltariQuery.isError ||
     parceleQuery.isError ||
@@ -87,6 +114,20 @@ export default function DashboardPage() {
   const activitati = activitatiQuery.data ?? []
   const vanzari = vanzariQuery.data ?? []
   const cheltuieli = cheltuieliQuery.data ?? []
+  const fallbackTenantId =
+    recoltari.find((item) => item.tenant_id)?.tenant_id ??
+    parcele.find((item) => item.tenant_id)?.tenant_id ??
+    activitati.find((item) => item.tenant_id)?.tenant_id ??
+    vanzari.find((item) => item.tenant_id)?.tenant_id ??
+    cheltuieli.find((item) => item.tenant_id)?.tenant_id ??
+    null
+  const activeTenantId = alertContextQuery.data?.tenantId ?? fallbackTenantId
+
+  const dismissalsQuery = useQuery({
+    queryKey: ['dashboard', 'alert-dismissals', activeTenantId],
+    queryFn: () => getTodayDismissals(activeTenantId!),
+    enabled: Boolean(activeTenantId),
+  })
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -97,7 +138,7 @@ export default function DashboardPage() {
       recDate.setHours(0, 0, 0, 0)
       return recDate.getTime() === today.getTime()
     })
-    .reduce((sum, r) => sum + Number(r.cantitate_kg || 0), 0)
+    .reduce((sum, r) => sum + Number(r.kg_cal1 || 0) + Number(r.kg_cal2 || 0), 0)
 
   const venitEstimat = kgAzi * PRICE_PER_KG_ESTIMATE
   const costMunca = kgAzi * LABOR_COST_PER_KG
@@ -142,6 +183,53 @@ export default function DashboardPage() {
     })),
   })
 
+  const dismissedKeys = new Set(dismissalsQuery.data ?? [])
+  const filteredAlerts = alerts.filter(
+    (alert) => !dismissedKeys.has(alert.alertKey) && !optimisticDismissedKeys.has(alert.alertKey)
+  )
+
+  const dismissAlertMutation = useMutation({
+    mutationFn: (alertKey: string) => {
+      const tenantId = activeTenantId
+      if (!tenantId) throw new Error('Tenant context missing')
+      return dismissAlert(tenantId, alertKey)
+    },
+    onSuccess: () => {
+      toast.success('Ascuns pentru azi')
+      void queryClient.invalidateQueries({ queryKey: ['dashboard', 'alert-dismissals'] })
+    },
+    onError: (error, alertKey) => {
+      setOptimisticDismissedKeys((prev) => {
+        const next = new Set(prev)
+        next.delete(alertKey)
+        return next
+      })
+      const message = (error as { message?: string } | null)?.message
+      toast.error(message ? `Nu am putut ascunde alerta: ${message}` : 'Nu am putut ascunde alerta.')
+    },
+  })
+
+  const dismissAllMutation = useMutation({
+    mutationFn: (alertKeys: string[]) => {
+      const tenantId = activeTenantId
+      if (!tenantId) throw new Error('Tenant context missing')
+      return dismissAlertsBulk(tenantId, alertKeys)
+    },
+    onSuccess: () => {
+      toast.success('Alertele au fost ascunse pentru azi')
+      void queryClient.invalidateQueries({ queryKey: ['dashboard', 'alert-dismissals'] })
+    },
+    onError: (error, alertKeys) => {
+      setOptimisticDismissedKeys((prev) => {
+        const next = new Set(prev)
+        alertKeys.forEach((key) => next.delete(key))
+        return next
+      })
+      const message = (error as { message?: string } | null)?.message
+      toast.error(message ? `Nu am putut ascunde toate alertele: ${message}` : 'Nu am putut ascunde toate alertele.')
+    },
+  })
+
   return (
     <AppShell
       header={
@@ -165,17 +253,45 @@ export default function DashboardPage() {
             <section className="agri-card space-y-3 p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-semibold text-[var(--agri-text)]">Smart Alerts</h3>
-                <span className="rounded-full bg-[var(--agri-surface-muted)] px-2 py-1 text-xs font-semibold text-[var(--agri-text-muted)]">
-                  {alerts.length}
-                </span>
+                <div className="flex items-center gap-2">
+                  {filteredAlerts.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const keys = filteredAlerts.map((alert) => alert.alertKey)
+                        setOptimisticDismissedKeys((prev) => {
+                          const next = new Set(prev)
+                          keys.forEach((key) => next.add(key))
+                          return next
+                        })
+                        dismissAllMutation.mutate(keys)
+                      }}
+                      className="rounded-lg border border-[var(--agri-border)] bg-white px-2 py-1 text-xs font-semibold text-[var(--agri-text)]"
+                      disabled={dismissAllMutation.isPending}
+                    >
+                      Ascunde toate azi
+                    </button>
+                  ) : null}
+                  <span className="rounded-full bg-[var(--agri-surface-muted)] px-2 py-1 text-xs font-semibold text-[var(--agri-text-muted)]">
+                    {filteredAlerts.length}
+                  </span>
+                </div>
               </div>
 
-              {alerts.length === 0 ? (
+              {filteredAlerts.length === 0 ? (
                 <p className="text-sm font-medium text-[var(--agri-text-muted)]">Nu exista alerte active.</p>
               ) : (
                 <div className="space-y-2">
-                  {alerts.map((alert) => (
-                    <AlertCard key={alert.id} alert={alert} />
+                  {filteredAlerts.map((alert) => (
+                    <AlertCard
+                      key={alert.id}
+                      alert={alert}
+                      onDismiss={(selectedAlert) => {
+                        setOptimisticDismissedKeys((prev) => new Set(prev).add(selectedAlert.alertKey))
+                        dismissAlertMutation.mutate(selectedAlert.alertKey)
+                      }}
+                      dismissing={dismissAlertMutation.isPending}
+                    />
                   ))}
                 </div>
               )}
@@ -247,3 +363,4 @@ export default function DashboardPage() {
     </AppShell>
   )
 }
+

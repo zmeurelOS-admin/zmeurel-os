@@ -51,7 +51,8 @@ interface RecoltareLite {
   data: string
   parcela_id: string | null
   culegator_id: string | null
-  cantitate_kg: number
+  kg_cal1: number
+  kg_cal2: number
 }
 
 interface VanzareLite {
@@ -115,6 +116,10 @@ interface DetailRow {
   label: string
   value: number
   secondary?: string
+}
+
+function recoltareTotalKg(row: RecoltareLite): number {
+  return Number(row.kg_cal1 || 0) + Number(row.kg_cal2 || 0)
 }
 
 function toInputDate(date: Date) {
@@ -260,7 +265,7 @@ export function RapoartePageClient({
   }, [initialCheltuieli, range.end, range.start])
 
   const kpi = useMemo(() => {
-    const productieKg = filteredRecoltari.reduce((sum, row) => sum + Number(row.cantitate_kg || 0), 0)
+    const productieKg = filteredRecoltari.reduce((sum, row) => sum + recoltareTotalKg(row), 0)
     const venitLei = filteredVanzari.reduce(
       (sum, row) => sum + Number(row.cantitate_kg || 0) * Number(row.pret_lei_kg || 0),
       0
@@ -277,7 +282,7 @@ export function RapoartePageClient({
       const grouped = new Map<string, number>()
       filteredRecoltari.forEach((row) => {
         const key = new Date(row.data).toLocaleDateString('ro-RO')
-        grouped.set(key, (grouped.get(key) ?? 0) + Number(row.cantitate_kg || 0))
+        grouped.set(key, (grouped.get(key) ?? 0) + recoltareTotalKg(row))
       })
       return Array.from(grouped.entries())
         .map(([label, value]) => ({ label, value, secondary: 'kg' }))
@@ -319,7 +324,7 @@ export function RapoartePageClient({
       filteredRecoltari.forEach((row) => {
         const parcela = row.parcela_id ? parcelaMap[row.parcela_id] : null
         const key = parcela?.nume_parcela || parcela?.id_parcela || 'Parcela necunoscuta'
-        grouped.set(key, (grouped.get(key) ?? 0) + Number(row.cantitate_kg || 0))
+        grouped.set(key, (grouped.get(key) ?? 0) + recoltareTotalKg(row))
       })
       return Array.from(grouped.entries())
         .map(([label, value]) => ({ label, value, secondary: 'kg' }))
@@ -331,7 +336,7 @@ export function RapoartePageClient({
       filteredRecoltari.forEach((row) => {
         const culegator = row.culegator_id ? culegatorMap[row.culegator_id] : null
         const key = culegator?.nume_prenume || culegator?.id_culegator || 'Culegator necunoscut'
-        grouped.set(key, (grouped.get(key) ?? 0) + Number(row.cantitate_kg || 0))
+        grouped.set(key, (grouped.get(key) ?? 0) + recoltareTotalKg(row))
       })
       return Array.from(grouped.entries())
         .map(([label, value]) => ({ label, value, secondary: 'kg' }))
@@ -379,7 +384,7 @@ export function RapoartePageClient({
       }
 
       const item = grouped.get(key)!
-      item.kgTotal += Number(row.cantitate_kg || 0)
+      item.kgTotal += recoltareTotalKg(row)
       item.days.add(dayKey)
     })
 
@@ -406,7 +411,7 @@ export function RapoartePageClient({
       }
 
       const item = grouped.get(key)!
-      item.kgTotal += Number(row.cantitate_kg || 0)
+      item.kgTotal += recoltareTotalKg(row)
       item.days.add(dayKey)
     })
 
@@ -424,7 +429,7 @@ export function RapoartePageClient({
     filteredRecoltari.forEach((row) => {
       const date = new Date(row.data)
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      grouped.set(key, (grouped.get(key) ?? 0) + Number(row.cantitate_kg || 0))
+      grouped.set(key, (grouped.get(key) ?? 0) + recoltareTotalKg(row))
     })
 
     return Array.from(grouped.entries())
@@ -567,7 +572,7 @@ export function RapoartePageClient({
           Data: new Date(row.data).toLocaleDateString('ro-RO'),
           Parcela: parcela?.nume_parcela || parcela?.id_parcela || '-',
           Culegator: culegator?.nume_prenume || culegator?.id_culegator || '-',
-          Kg: Number(row.cantitate_kg || 0).toFixed(2),
+          Kg: recoltareTotalKg(row).toFixed(2),
         }
       })
 

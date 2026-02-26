@@ -57,7 +57,7 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
     mutationFn: createClienti,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clienti'] })
-      toast.success('Client adaugat cu succes')
+      toast.success('Client adăugat cu succes')
       setDialogOpen(false)
     },
     onError: (err: Error) => {
@@ -83,7 +83,7 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
     mutationFn: deleteClienti,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clienti'] })
-      toast.success('Client sters')
+      toast.success('Client șters')
     },
     onError: (err: Error) => {
       toast.error(err.message)
@@ -113,7 +113,7 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
 
     pendingDeleteTimers.current[clientId] = timer
 
-    toast.warning('Client programat pentru stergere.', {
+    toast.warning('Client programat pentru ștergere.', {
       duration: 5000,
       action: {
         label: 'Undo',
@@ -124,7 +124,7 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
           delete pendingDeleteTimers.current[clientId]
           delete pendingDeletedItems.current[clientId]
           queryClient.invalidateQueries({ queryKey: ['clienti'] })
-          toast.success('Stergerea a fost anulata.')
+          toast.success('Ștergerea a fost anulată.')
         },
       },
     })
@@ -147,8 +147,8 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
 
   return (
     <AppShell
-      header={<PageHeader title="Clienti" subtitle="Administrare clienti si preturi negociate" rightSlot={<UserCheck className="h-5 w-5" />} />}
-      fab={<Fab onClick={() => setDialogOpen(true)} label="Adauga client" />}
+      header={<PageHeader title="Clienți" subtitle="Administrare clienți și prețuri negociate" rightSlot={<UserCheck className="h-5 w-5" />} />}
+      fab={<Fab onClick={() => setDialogOpen(true)} label="Adaugă client" />}
       bottomBar={
         <StickyActionBar>
           <div className="flex items-center justify-between gap-3">
@@ -161,11 +161,11 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
         <div className="flex items-center gap-2">
           <Input
             className="agri-control h-12"
-            placeholder="Cauta client dupa nume, telefon sau email..."
+            placeholder="Caută client după nume, telefon sau email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Button type="button" variant="outline" className="h-12 w-12 shrink-0 p-0" aria-label="Cauta clienti">
+          <Button type="button" variant="outline" className="h-12 w-12 shrink-0 p-0" aria-label="Caută clienți">
             <Search className="h-4 w-4" />
           </Button>
         </div>
@@ -176,17 +176,17 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
           onClick={() => setAddOrderOpen(true)}
         >
           <ShoppingCart className="h-4 w-4" />
-          Comanda noua
+          Comandă nouă
         </Button>
 
-        {isError ? <ErrorState title="Eroare la incarcare" message={(error as Error).message} onRetry={refresh} /> : null}
-        {isLoading ? <LoadingState label="Se incarca clientii..." /> : null}
+        {isError ? <ErrorState title="Eroare la încărcare" message={(error as Error).message} onRetry={refresh} /> : null}
+        {isLoading ? <LoadingState label="Se încarcă clienții..." /> : null}
 
         {!isLoading && !isError && filteredClienti.length === 0 ? (
           <EmptyState
             title="Niciun client"
-            description="Adauga primul client folosind actiunea principala."
-            primaryAction={{ label: 'Adauga client', onClick: () => setDialogOpen(true) }}
+            description="Adaugă primul client folosind acțiunea principală."
+            primaryAction={{ label: 'Adaugă client', onClick: () => setDialogOpen(true) }}
           />
         ) : null}
 
@@ -256,6 +256,7 @@ export function ClientPageClient({ initialClienti }: ClientPageClientProps) {
         }}
         itemType="Client"
         itemName={deletingClient?.nume_client}
+        description="Clientul selectat va fi sters definitiv."
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!deletingClient) return

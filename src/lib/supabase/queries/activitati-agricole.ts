@@ -1,5 +1,5 @@
 // src/lib/supabase/queries/activitati-agricole.ts
-import { createClient } from '../client'
+import { getSupabase } from '../client'
 
 export const TIPURI_ACTIVITATI = [
   'Tratament Fungicid',
@@ -79,7 +79,7 @@ const toError = (error: SupabaseLikeError): Error & SupabaseLikeError => {
 }
 
 async function generateNextId(): Promise<string> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('activitati_agricole')
@@ -106,11 +106,11 @@ async function generateNextId(): Promise<string> {
 }
 
 export async function getActivitatiAgricole(): Promise<ActivitateAgricola[]> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('activitati_agricole')
-    .select('*')
+    .select('id,id_activitate,data_aplicare,parcela_id,tip_activitate,produs_utilizat,doza,timp_pauza_zile,operator,observatii,created_at,updated_at,tenant_id')
     .order('data_aplicare', { ascending: false })
     .order('created_at', { ascending: false })
 
@@ -119,13 +119,13 @@ export async function getActivitatiAgricole(): Promise<ActivitateAgricola[]> {
     throw error
   }
 
-  return data ?? []
+  return (data ?? []) as unknown as ActivitateAgricola[]
 }
 
 export async function createActivitateAgricola(
   input: CreateActivitateAgricolaInput
 ): Promise<ActivitateAgricola> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   const nextId = await generateNextId()
   const {
     data: { user },
@@ -189,7 +189,7 @@ export async function createActivitateAgricola(
         throw toError(fallbackError)
       }
 
-      return fallbackData as ActivitateAgricola
+      return fallbackData as unknown as ActivitateAgricola
     }
 
     console.error('Error creating activitate:', {
@@ -202,14 +202,14 @@ export async function createActivitateAgricola(
     throw toError(maybeError)
   }
 
-  return data
+  return data as unknown as ActivitateAgricola
 }
 
 export async function updateActivitateAgricola(
   id: string,
   input: UpdateActivitateAgricolaInput
 ): Promise<ActivitateAgricola> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('activitati_agricole')
@@ -226,11 +226,11 @@ export async function updateActivitateAgricola(
     throw error
   }
 
-  return data
+  return data as unknown as ActivitateAgricola
 }
 
 export async function deleteActivitateAgricola(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { error } = await supabase
     .from('activitati_agricole')
@@ -262,3 +262,5 @@ export function calculatePauseStatus(
     status: today >= recoltareDate ? 'OK' : 'Pauza',
   }
 }
+
+

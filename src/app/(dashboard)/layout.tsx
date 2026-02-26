@@ -7,13 +7,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <Providers>
       <div className="hidden min-h-screen lg:flex">
         <Sidebar />
-        <main className="flex min-h-screen flex-1 flex-col overflow-hidden lg:ml-64">
-          <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+        <main className="flex-1 overflow-y-auto lg:ml-64">
+          <div className="min-h-screen">{children}</div>
         </main>
       </div>
 
-      <div className="relative flex h-[100dvh] min-h-[100svh] flex-col overflow-hidden lg:hidden">
-        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      <div className="lg:hidden">
+        {children}
         <BottomTabBar />
       </div>
     </Providers>

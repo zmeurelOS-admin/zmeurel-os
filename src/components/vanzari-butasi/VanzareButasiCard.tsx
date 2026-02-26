@@ -1,7 +1,8 @@
 'use client'
 
+import { Badge } from '@/components/ui/badge'
 import { CompactListCard } from '@/components/app/CompactListCard'
-import { VanzareButasi } from '@/lib/supabase/queries/vanzari-butasi'
+import { type VanzareButasi, type VanzareButasiStatus } from '@/lib/supabase/queries/vanzari-butasi'
 
 interface VanzareButasiCardProps {
   vanzare: VanzareButasi
@@ -11,6 +12,26 @@ interface VanzareButasiCardProps {
   onDelete: (vanzare: VanzareButasi) => void
 }
 
+const statusClasses: Record<VanzareButasiStatus, string> = {
+  noua: 'bg-slate-100 text-slate-700',
+  confirmata: 'bg-emerald-100 text-emerald-800',
+  pregatita: 'bg-blue-100 text-blue-800',
+  livrata: 'bg-green-100 text-green-800',
+  anulata: 'bg-red-100 text-red-700',
+}
+
+const statusLabels: Record<VanzareButasiStatus, string> = {
+  noua: 'Noua',
+  confirmata: 'Confirmata',
+  pregatita: 'Pregatita',
+  livrata: 'Livrata',
+  anulata: 'Anulata',
+}
+
+function formatLei(value: number): string {
+  return `${value.toFixed(2)} lei`
+}
+
 export function VanzareButasiCard({
   vanzare,
   clientNume,
@@ -18,21 +39,25 @@ export function VanzareButasiCard({
   onEdit,
   onDelete,
 }: VanzareButasiCardProps) {
-  const valoareTotala = vanzare.cantitate_butasi * vanzare.pret_unitar_lei
-  const subtitle = `${new Date(vanzare.data).toLocaleDateString('ro-RO')} · ${vanzare.soi_butasi}`
-  const metadata = `${vanzare.cantitate_butasi} butasi · ${vanzare.pret_unitar_lei.toFixed(2)} lei/buc`
+  const restDeIncasat = Number(vanzare.total_lei) - Number(vanzare.avans_suma)
+  const deliveryDate = vanzare.data_livrare_estimata
+    ? new Date(vanzare.data_livrare_estimata).toLocaleDateString('ro-RO')
+    : 'Nespecificata'
 
   return (
     <CompactListCard
-      title="Vanzare butasi"
-      subtitle={subtitle}
-      metadata={clientNume ? `· ${clientNume}` : undefined}
+      title={clientNume || 'Client necunoscut'}
+      subtitle={`Livrare: ${deliveryDate}`}
+      metadata={parcelaNume ? `Parcela: ${parcelaNume}` : undefined}
       status={
-        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-          {parcelaNume ? `Sursa: ${parcelaNume}` : 'Material saditor'}
-        </span>
+        <div className="flex items-center gap-2">
+          <Badge className={statusClasses[vanzare.status]}>{statusLabels[vanzare.status]}</Badge>
+          {restDeIncasat > 0 ? (
+            <Badge className="bg-amber-100 text-amber-800">Rest: {formatLei(restDeIncasat)}</Badge>
+          ) : null}
+        </div>
       }
-      trailingMeta={`${metadata} · ${valoareTotala.toFixed(2)} lei`}
+      trailingMeta={`Total: ${formatLei(Number(vanzare.total_lei))}`}
       onEdit={() => onEdit(vanzare)}
       onDelete={() => onDelete(vanzare)}
     />

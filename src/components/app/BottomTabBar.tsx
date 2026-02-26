@@ -8,10 +8,10 @@ import { useState } from 'react'
 import { MoreMenuDrawer } from '@/components/app/MoreMenuDrawer'
 
 const tabs = [
-  { label: 'Activitati', href: '/activitati-agricole', icon: ClipboardList },
+  { label: 'Activități', href: '/activitati-agricole', icon: ClipboardList },
   { label: 'Cheltuieli', href: '/cheltuieli', icon: Receipt },
-  { label: 'Vanzari', href: '/vanzari', icon: BanknoteArrowUp },
-  { label: 'Recoltari', href: '/recoltari', icon: PackageOpen },
+  { label: 'Vânzări', href: '/vanzari', icon: BanknoteArrowUp },
+  { label: 'Recoltări', href: '/recoltari', icon: PackageOpen },
 ]
 
 export function BottomTabBar() {
@@ -23,7 +23,7 @@ export function BottomTabBar() {
       <nav
         className="fixed inset-x-0 bottom-0 z-[100000060] border-t border-[var(--agri-border)] bg-white/95 backdrop-blur"
         style={{ paddingBottom: 'var(--safe-b)' }}
-        aria-label="Navigare principala"
+        aria-label="Navigare principală"
       >
         <div className="mx-auto grid h-[var(--tabbar-h)] w-full max-w-4xl grid-cols-5 gap-1 px-2">
           {tabs.map((tab) => {

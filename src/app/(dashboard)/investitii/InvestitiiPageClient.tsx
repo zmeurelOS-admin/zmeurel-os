@@ -22,6 +22,7 @@ import {
   getInvestitii,
   type Investitie,
 } from '@/lib/supabase/queries/investitii'
+import { buildInvestitieDeleteLabel } from '@/lib/ui/delete-labels'
 
 interface Parcela {
   id: string
@@ -142,8 +143,12 @@ export function InvestitiiPageClient({ initialInvestitii, parcele }: InvestitiiP
         onConfirm={() => {
           if (deletingInvestitie) deleteMutation.mutate(deletingInvestitie.id)
         }}
-        itemName={deletingInvestitie?.categorie || 'investitia selectata'}
+        itemName={buildInvestitieDeleteLabel(
+          deletingInvestitie,
+          deletingInvestitie?.parcela_id ? parcelaMap[deletingInvestitie.parcela_id] : ''
+        )}
         itemType="investitie"
+        description="Investitia selectata va fi stearsa definitiv."
       />
     </AppShell>
   )

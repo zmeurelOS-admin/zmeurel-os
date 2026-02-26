@@ -16,11 +16,13 @@ import { AddVanzareDialog } from '@/components/vanzari/AddVanzareDialog'
 import { EditVanzareDialog } from '@/components/vanzari/EditVanzareDialog'
 import { VanzareCard } from '@/components/vanzari/VanzareCard'
 import { Input } from '@/components/ui/input'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 import {
   deleteVanzare,
   getVanzari,
   type Vanzare,
 } from '@/lib/supabase/queries/vanzari'
+import { buildVanzareDeleteLabel } from '@/lib/ui/delete-labels'
 
 interface Client {
   id: string
@@ -57,7 +59,8 @@ export function VanzariPageClient({ initialVanzari, clienti }: VanzariPageClient
     mutationFn: deleteVanzare,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vanzari'] })
-      toast.success('Vanzare stearsa')
+      trackEvent('delete_item', 'vanzari')
+      toast.success('Vânzare ștearsă')
       setDeletingVanzare(null)
     },
     onError: (err: Error) => {
@@ -88,7 +91,7 @@ export function VanzariPageClient({ initialVanzari, clienti }: VanzariPageClient
 
     pendingDeleteTimers.current[vanzareId] = timer
 
-    toast.warning('Vanzarea a fost programata pentru stergere.', {
+    toast.warning('Vânzarea a fost programată pentru ștergere.', {
       duration: 5000,
       action: {
         label: 'Undo',
@@ -99,7 +102,7 @@ export function VanzariPageClient({ initialVanzari, clienti }: VanzariPageClient
           delete pendingDeleteTimers.current[vanzareId]
           delete pendingDeletedItems.current[vanzareId]
           queryClient.invalidateQueries({ queryKey: ['vanzari'] })
-          toast.success('Stergerea a fost anulata.')
+          toast.success('Ștergerea a fost anulată.')
         },
       },
     })
@@ -136,8 +139,8 @@ export function VanzariPageClient({ initialVanzari, clienti }: VanzariPageClient
 
   return (
     <AppShell
-      header={<PageHeader title="Vanzari Fructe" subtitle="Gestionare venituri din productie" />}
-      fab={<Fab onClick={() => setAddOpen(true)} label="Adauga vanzare" />}
+      header={<PageHeader title="Vânzări Fructe" subtitle="Gestionare venituri din producție" />}
+      fab={<Fab onClick={() => setAddOpen(true)} label="Adaugă vânzare" />}
       bottomBar={
         <StickyActionBar>
           <div className="flex items-center justify-between gap-3">
@@ -147,15 +150,15 @@ export function VanzariPageClient({ initialVanzari, clienti }: VanzariPageClient
       }
     >
       <div className="mx-auto w-full max-w-4xl space-y-4 py-4">
-        <Input className="agri-control h-12" placeholder="Cauta dupa client sau status..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <Input className="agri-control h-12" placeholder="Caută după client sau status..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
 
-        {isError ? <ErrorState title="Eroare la incarcare" message={(error as Error).message} onRetry={refresh} /> : null}
-        {isLoading ? <LoadingState label="Se incarca vanzarile..." /> : null}
+        {isError ? <ErrorState title="Eroare la încărcare" message={(error as Error).message} onRetry={refresh} /> : null}
+        {isLoading ? <LoadingState label="Se încarcă vânzările..." /> : null}
         {!isLoading && !isError && filteredVanzari.length === 0 ? (
           <EmptyState
-            title="Nu exista vanzari"
-            description="Inregistreaza prima vanzare pentru a urmari veniturile."
-            primaryAction={{ label: 'Adauga vanzare', onClick: () => setAddOpen(true) }}
+            title="Nu există vânzări"
+            description="Înregistrează prima vânzare pentru a urmări veniturile."
+            primaryAction={{ label: 'Adaugă vânzare', onClick: () => setAddOpen(true) }}
           />
         ) : null}
 
@@ -194,8 +197,12 @@ export function VanzariPageClient({ initialVanzari, clienti }: VanzariPageClient
           scheduleDelete(deletingVanzare)
           setDeletingVanzare(null)
         }}
-        itemName={deletingVanzare?.data ? `din ${new Date(deletingVanzare.data).toLocaleDateString('ro-RO')}` : ''}
-        itemType="Vanzare"
+        itemName={buildVanzareDeleteLabel(
+          deletingVanzare,
+          deletingVanzare?.client_id ? clientMap[deletingVanzare.client_id] : ''
+        )}
+        itemType="Vânzare"
+        description="Vânzarea selectată va fi ștearsă definitiv."
         loading={deleteMutation.isPending}
       />
     </AppShell>

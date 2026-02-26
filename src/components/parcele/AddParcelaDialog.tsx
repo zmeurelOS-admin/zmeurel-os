@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -6,25 +6,18 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Loader2 } from 'lucide-react';
-import { createParcela } from '@/lib/supabase/queries/parcele';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Loader2, Plus } from 'lucide-react';
+
+import { AppDialog } from '@/components/app/AppDialog';
 import { Button } from '@/components/ui/button';
+import { createParcela } from '@/lib/supabase/queries/parcele';
 import { ParcelaForm, type ParcelaFormData } from './ParcelaForm';
 
 const parcelaSchema = z.object({
   nume_parcela: z.string().min(1, 'Numele parcelei este obligatoriu'),
-  suprafata_m2: z.string().min(1, 'Suprafața este obligatorie'),
+  suprafata_m2: z.string().min(1, 'Suprafata este obligatorie'),
   soi_plantat: z.string().optional(),
-  an_plantare: z.string().min(1, 'Anul plantării este obligatoriu'),
+  an_plantare: z.string().min(1, 'Anul plantarii este obligatoriu'),
   nr_plante: z.string().optional(),
   status: z.string().default('Activ'),
   observatii: z.string().optional(),
@@ -35,10 +28,7 @@ interface AddParcelaDialogProps {
   onSuccess: () => void;
 }
 
-export function AddParcelaDialog({
-  soiuriDisponibile,
-  onSuccess,
-}: AddParcelaDialogProps) {
+export function AddParcelaDialog({ soiuriDisponibile, onSuccess }: AddParcelaDialogProps) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -57,7 +47,7 @@ export function AddParcelaDialog({
 
   const createMutation = useMutation({
     mutationFn: async (data: ParcelaFormData) => {
-      const idParcela = `PAR-${Date.now().toString().slice(-6)}`
+      const idParcela = `PAR-${Date.now().toString().slice(-6)}`;
       return createParcela({
         id_parcela: idParcela,
         nume_parcela: data.nume_parcela,
@@ -71,7 +61,7 @@ export function AddParcelaDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['parcele'] });
-      toast.success('Parcela a fost adăugată cu succes!');
+      toast.success('Parcela a fost adaugata cu succes');
       form.reset();
       setOpen(false);
       onSuccess();
@@ -86,47 +76,39 @@ export function AddParcelaDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="lg" className="w-full h-14 rounded-2xl shadow-sm">
-          <Plus className="h-5 w-5 mr-2" />
-          Adaugă Parcelă
-        </Button>
-      </DialogTrigger>
+    <>
+      <Button size="lg" className="h-14 w-full rounded-2xl shadow-sm" onClick={() => setOpen(true)}>
+        <Plus className="mr-2 h-5 w-5" />
+        Adauga Parcela
+      </Button>
 
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Adaugă Parcelă Nouă</DialogTitle>
-          <DialogDescription>
-            Completează detaliile parcelei. ID-ul se va genera automat.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <ParcelaForm form={form} soiuriDisponibile={soiuriDisponibile} />
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={createMutation.isPending}
-            >
-              Anulează
+      <AppDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Adauga Parcela Noua"
+        description="Completeaza detaliile parcelei. ID-ul se genereaza automat."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={createMutation.isPending}>
+              Anuleaza
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" form="add-parcela-form" disabled={createMutation.isPending}>
               {createMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Se salvează...
+                  Se salveaza...
                 </>
               ) : (
-                'Salvează Parcela'
+                'Salveaza Parcela'
               )}
             </Button>
-          </DialogFooter>
+          </>
+        }
+      >
+        <form id="add-parcela-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <ParcelaForm form={form} soiuriDisponibile={soiuriDisponibile} />
         </form>
-      </DialogContent>
-    </Dialog>
+      </AppDialog>
+    </>
   );
 }

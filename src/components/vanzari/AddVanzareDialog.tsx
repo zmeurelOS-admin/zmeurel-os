@@ -98,12 +98,12 @@ export function AddVanzareDialog({ open, onOpenChange, hideTrigger = false }: Ad
     mutationFn: createVanzare,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vanzari'] })
-      trackEvent('create_vanzare', { source: 'AddVanzareDialog' })
+      trackEvent('create_vanzare', 'vanzari', { source: 'AddVanzareDialog' })
       toast.success('Vanzare adaugata')
       setDialogOpen(false)
     },
     onError: (error) => {
-      const maybeError = error as { status?: number; code?: string }
+      const maybeError = error as { status?: number; code?: string; message?: string; details?: string; hint?: string }
       const conflict = maybeError?.status === 409 || maybeError?.code === '23505'
       if (conflict) {
         toast.info('Inregistrarea era deja sincronizata.')
@@ -111,8 +111,19 @@ export function AddVanzareDialog({ open, onOpenChange, hideTrigger = false }: Ad
         return
       }
 
-      console.error('Error creating vanzare:', error)
-      toast.error('Eroare la adaugarea vanzarii')
+      const message =
+        maybeError?.message ||
+        maybeError?.details ||
+        maybeError?.hint ||
+        'Eroare la adaugarea vanzarii'
+
+      console.error('Error creating vanzare:', {
+        message: maybeError?.message,
+        code: maybeError?.code,
+        details: maybeError?.details,
+        hint: maybeError?.hint,
+      })
+      toast.error(message)
     },
   })
 

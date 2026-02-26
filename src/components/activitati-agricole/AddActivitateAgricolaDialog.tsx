@@ -81,7 +81,7 @@ export function AddActivitateAgricolaDialog({ open, onOpenChange, hideTrigger = 
     mutationFn: createActivitateAgricola,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activitati'] })
-      trackEvent('create_activitate', { source: 'AddActivitateAgricolaDialog' })
+      trackEvent('create_activitate', 'activitati', { source: 'AddActivitateAgricolaDialog' })
       toast.success('Activitate salvata')
       setDialogOpen(false)
     },

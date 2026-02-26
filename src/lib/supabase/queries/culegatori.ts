@@ -1,4 +1,4 @@
-import { createClient } from '../client'
+import { getSupabase } from '../client'
 
 // ========================================
 // TYPES
@@ -43,7 +43,7 @@ export interface UpdateCulegatorInput {
 // ========================================
 
 async function generateNextId(
-  supabase: ReturnType<typeof createClient>
+  supabase: ReturnType<typeof getSupabase>
 ): Promise<string> {
   const { data, error } = await supabase
     .from('culegatori')
@@ -67,16 +67,16 @@ async function generateNextId(
 // ========================================
 
 export async function getCulegatori(): Promise<Culegator[]> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('culegatori')
-    .select('*')
+    .select('id,id_culegator,nume_prenume,tarif_lei_kg,data_angajare,status_activ,telefon,tip_angajare,observatii,created_at,updated_at,tenant_id')
     .order('created_at', { ascending: false })
 
   if (error) throw error
 
-  return data ?? []
+  return (data ?? []) as unknown as Culegator[]
 }
 
 // ========================================
@@ -86,7 +86,7 @@ export async function getCulegatori(): Promise<Culegator[]> {
 export async function createCulegator(
   input: CreateCulegatorInput
 ): Promise<Culegator> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   const id_culegator = await generateNextId(supabase)
 
   const payload = {
@@ -118,7 +118,7 @@ export async function createCulegator(
 
   if (error) throw error
 
-  return data
+  return data as unknown as Culegator
 }
 
 // ========================================
@@ -129,7 +129,7 @@ export async function updateCulegator(
   id: string,
   input: UpdateCulegatorInput
 ): Promise<Culegator> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const payload = {
     ...input,
@@ -159,7 +159,7 @@ export async function updateCulegator(
 
   if (error) throw error
 
-  return data
+  return data as unknown as Culegator
 }
 
 // ========================================
@@ -167,7 +167,7 @@ export async function updateCulegator(
 // ========================================
 
 export async function deleteCulegator(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { error } = await supabase
     .from('culegatori')
@@ -176,3 +176,4 @@ export async function deleteCulegator(id: string): Promise<void> {
 
   if (error) throw error
 }
+

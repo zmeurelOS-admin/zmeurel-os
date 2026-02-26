@@ -404,3 +404,13 @@ Planificat pentru viitor: MIT License când devine open-source / SaaS public.
 **De la fermă la digital - Zmeurel OS! 🍓💻✨**
 
 *Built with ❤️ și foarte mult debugging în Suceava, România*
+
+---
+
+## Supabase PostgREST schema cache
+
+Dupa migrari care adauga/renumesc coloane, daca apare eroare de tip `schema cache`, ruleaza in Supabase SQL Editor:
+
+```sql
+SELECT pg_notify('pgrst', 'reload schema');
+```

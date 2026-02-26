@@ -48,7 +48,7 @@ body {
 }
 
 body {
-  overflow: hidden;
+  overflow-x: hidden;
   background: var(--agri-bg);
   color: var(--agri-text);
   font-family: var(--font-inter), "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -103,4 +103,46 @@ html.high-visibility-mode {
 
 html.high-visibility-mode body {
   font-size: 17px;
+}
+
+html[data-density='compact'] {
+  --touch-control-h: 44px;
+  --touch-control-h-lg: 50px;
+  --agri-radius: 14px;
+  --agri-shadow: 0 6px 16px rgba(16, 32, 21, 0.1);
+}
+
+html[data-density='compact'] .agri-card {
+  box-shadow: var(--agri-shadow);
+}
+
+html[data-density='compact'] [data-slot='card'] {
+  gap: 1rem;
+  border-radius: 1rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+html[data-density='compact'] [data-slot='card-header'] {
+  gap: 0.375rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+html[data-density='compact'] [data-slot='card-content'],
+html[data-density='compact'] [data-slot='card-footer'] {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+html[data-density='compact'] [data-slot='table-head'] {
+  height: 2rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  font-size: 0.75rem;
+}
+
+html[data-density='compact'] [data-slot='table-cell'] {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
 }

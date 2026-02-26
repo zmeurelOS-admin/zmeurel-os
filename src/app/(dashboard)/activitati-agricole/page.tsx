@@ -18,11 +18,13 @@ import { PageHeader } from '@/components/app/PageHeader'
 import { StickyActionBar } from '@/components/app/StickyActionBar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 import {
   deleteActivitateAgricola,
   getActivitatiAgricole,
   type ActivitateAgricola,
 } from '@/lib/supabase/queries/activitati-agricole'
+import { buildActivitateDeleteLabel } from '@/lib/ui/delete-labels'
 
 export default function ActivitatiPage() {
   const queryClient = useQueryClient()
@@ -51,7 +53,8 @@ export default function ActivitatiPage() {
     mutationFn: deleteActivitateAgricola,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activitati'] })
-      toast.success('Activitate stearsa')
+      trackEvent('delete_item', 'activitati')
+      toast.success('Activitate ștearsă')
     },
     onError: (err: Error) => {
       toast.error(err.message)
@@ -81,7 +84,7 @@ export default function ActivitatiPage() {
 
     pendingDeleteTimers.current[activitateId] = timer
 
-    toast.warning('Activitatea a fost programata pentru stergere.', {
+    toast.warning('Activitatea a fost programată pentru ștergere.', {
       duration: 5000,
       action: {
         label: 'Undo',
@@ -92,7 +95,7 @@ export default function ActivitatiPage() {
           delete pendingDeleteTimers.current[activitateId]
           delete pendingDeletedItems.current[activitateId]
           queryClient.invalidateQueries({ queryKey: ['activitati'] })
-          toast.success('Stergerea a fost anulata.')
+          toast.success('Ștergerea a fost anulată.')
         },
       },
     })
@@ -122,7 +125,7 @@ export default function ActivitatiPage() {
 
   return (
     <AppShell
-      header={<PageHeader title="Activitati Agricole" subtitle="Istoric lucrari si tratamente" rightSlot={<ClipboardList className="h-5 w-5" />} />}
+      header={<PageHeader title="Activități Agricole" subtitle="Istoric lucrări și tratamente" rightSlot={<ClipboardList className="h-5 w-5" />} />}
       fab={<Fab onClick={() => setAddOpen(true)} label="Adauga activitate" />}
       bottomBar={
         <StickyActionBar>
@@ -136,22 +139,22 @@ export default function ActivitatiPage() {
         <div className="flex items-center gap-2">
           <Input
             className="agri-control h-12"
-            placeholder="Cauta activitate, produs, doza..."
+            placeholder="Caută activitate, produs, doză..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <Button type="button" variant="outline" className="h-12 w-12 shrink-0 p-0" aria-label="Cauta activitati">
+          <Button type="button" variant="outline" className="h-12 w-12 shrink-0 p-0" aria-label="Caută activități">
             <Search className="h-4 w-4" />
           </Button>
         </div>
 
-        {isError ? <ErrorState title="Eroare la incarcare" message={(error as Error).message} onRetry={refresh} /> : null}
-        {isLoading ? <LoadingState label="Se incarca activitatile..." /> : null}
+        {isError ? <ErrorState title="Eroare la încărcare" message={(error as Error).message} onRetry={refresh} /> : null}
+        {isLoading ? <LoadingState label="Se încarcă activitățile..." /> : null}
         {!isLoading && !isError && filteredActivitati.length === 0 ? (
           <EmptyState
-            title="Nu exista activitati"
-            description="Adauga prima lucrare pentru a pastra istoricul tratamentelor."
-            primaryAction={{ label: 'Adauga activitate', onClick: () => setAddOpen(true) }}
+            title="Nu există activități"
+            description="Adaugă prima lucrare pentru a păstra istoricul tratamentelor."
+            primaryAction={{ label: 'Adaugă activitate', onClick: () => setAddOpen(true) }}
           />
         ) : null}
 
@@ -192,7 +195,8 @@ export default function ActivitatiPage() {
           if (!open) setToDelete(null)
         }}
         itemType="Activitate"
-        itemName={toDelete?.tip_activitate || 'activitatea selectata'}
+        itemName={buildActivitateDeleteLabel(toDelete)}
+        description="Activitatea selectată va fi ștearsă definitiv."
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!toDelete) return

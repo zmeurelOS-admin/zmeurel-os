@@ -1,61 +1,50 @@
-'use client';
+'use client'
 
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
+import { LogOut } from 'lucide-react'
+
+import { getSupabase } from '@/lib/supabase/client'
 
 export default function LogoutButton() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleLogout = async () => {
-    console.log('🔴 Logout clicked');
-
     try {
-      setIsLoading(true);
+      setIsLoading(true)
 
-      const supabase = createClient();
-
-      // STEP 1: Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
+      const supabase = getSupabase()
+      const { error } = await supabase.auth.signOut()
 
       if (error) {
-        console.error('❌ Eroare logout:', error);
-        alert('Eroare la deconectare. Încearcă din nou.');
-        return;
+        alert('Eroare la deconectare. Încearcă din nou.')
+        return
       }
 
-      console.log('✅ Supabase signOut successful');
-
-      // STEP 2: Cancel ongoing queries
-      await queryClient.cancelQueries();
-
-      // STEP 3: Clear React Query cache
-      queryClient.clear();
-
-      console.log('🧹 Cache cleared');
-
-      // STEP 4: Hard redirect (complete reset)
-      window.location.href = '/login';
-
-    } catch (err) {
-      console.error('❌ Eroare logout:', err);
-      alert('Eroare la deconectare. Încearcă din nou.');
+      await queryClient.cancelQueries()
+      queryClient.clear()
+      router.push('/login')
+      router.refresh()
+    } catch {
+      alert('Eroare la deconectare. Încearcă din nou.')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
     <button
       type="button"
       onClick={handleLogout}
       disabled={isLoading}
-      className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {isLoading ? 'Se deconectează...' : '🚪 Ieșire'}
+      <LogOut className="h-4 w-4" />
+      {isLoading ? 'Se deconectează...' : 'Deconectare'}
     </button>
-  );
+  )
 }
+

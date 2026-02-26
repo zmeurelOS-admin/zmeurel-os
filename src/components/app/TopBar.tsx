@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Tractor } from 'lucide-react'
 
 import { FarmSwitcher } from '@/components/app/FarmSwitcher'
+import { isSuperAdmin } from '@/lib/auth/isSuperAdmin'
+import { getSupabase } from '@/lib/supabase/client'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +15,17 @@ import {
 
 export function TopBar() {
   const [farmDialogOpen, setFarmDialogOpen] = useState(false)
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false)
+
+  useEffect(() => {
+    void (async () => {
+      const supabase = getSupabase()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setIsSuperAdminUser(user?.id ? await isSuperAdmin(supabase, user.id) : false)
+    })()
+  }, [])
 
   return (
     <>
@@ -26,14 +39,14 @@ export function TopBar() {
             Zmeurel
           </div>
 
-          <FarmSwitcher variant="chip" onActivate={() => setFarmDialogOpen(true)} />
+          {isSuperAdminUser ? <FarmSwitcher variant="chip" onActivate={() => setFarmDialogOpen(true)} /> : null}
         </div>
       </div>
 
-      <Dialog open={farmDialogOpen} onOpenChange={setFarmDialogOpen}>
+      <Dialog open={isSuperAdminUser && farmDialogOpen} onOpenChange={setFarmDialogOpen}>
         <DialogContent className="w-[92%] max-w-md rounded-2xl p-4 sm:p-5">
           <DialogHeader>
-            <DialogTitle>Schimba ferma</DialogTitle>
+            <DialogTitle>Schimbă fermă</DialogTitle>
           </DialogHeader>
           <FarmSwitcher variant="panel" />
         </DialogContent>

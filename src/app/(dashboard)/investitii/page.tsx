@@ -8,7 +8,7 @@ export default async function InvestitiiPage() {
 
   const { data: investitii } = await supabase
     .from('investitii')
-    .select('*')
+    .select('id,id_investitie,data,parcela_id,categorie,furnizor,descriere,document_url,suma_lei,created_at,updated_at,tenant_id')
     .order('data', { ascending: false })
 
   const { data: parcele } = await supabase
@@ -23,3 +23,4 @@ export default async function InvestitiiPage() {
     />
   )
 }
+

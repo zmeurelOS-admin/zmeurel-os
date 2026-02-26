@@ -17,11 +17,13 @@ import { EditRecoltareDialog } from '@/components/recoltari/EditRecoltareDialog'
 import { RecoltareCard } from '@/components/recoltari/RecoltareCard'
 import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog'
 import { Input } from '@/components/ui/input'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 import {
   deleteRecoltare,
   getRecoltari,
   type Recoltare,
 } from '@/lib/supabase/queries/recoltari'
+import { buildRecoltareDeleteLabel } from '@/lib/ui/delete-labels'
 
 interface Parcela {
   id: string
@@ -31,9 +33,10 @@ interface Parcela {
 interface RecoltariPageClientProps {
   initialRecoltari: Recoltare[]
   parcele: Parcela[]
+  initialError?: string | null
 }
 
-export function RecoltariPageClient({ initialRecoltari, parcele }: RecoltariPageClientProps) {
+export function RecoltariPageClient({ initialRecoltari, parcele, initialError = null }: RecoltariPageClientProps) {
   const queryClient = useQueryClient()
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -50,13 +53,15 @@ export function RecoltariPageClient({ initialRecoltari, parcele }: RecoltariPage
     queryKey: ['recoltari'],
     queryFn: getRecoltari,
     initialData: initialRecoltari,
+    enabled: !initialError,
   })
 
   const deleteMutation = useMutation({
     mutationFn: deleteRecoltare,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recoltari'] })
-      toast.success('Recoltare stearsa')
+      trackEvent('delete_item', 'recoltari')
+      toast.success('Recoltare ștearsă')
       setDeletingRecoltare(null)
     },
     onError: (err: Error) => {
@@ -82,12 +87,21 @@ export function RecoltariPageClient({ initialRecoltari, parcele }: RecoltariPage
     )
   }, [recoltari, searchTerm, parcelaMap])
 
-  const totalCantitateKg = useMemo(() => filteredRecoltari.reduce((sum, r) => sum + r.cantitate_kg, 0), [filteredRecoltari])
+  const getRecoltareKg = (recoltare: Recoltare) => {
+    const kgCal1 = Number(recoltare.kg_cal1 ?? 0)
+    const kgCal2 = Number(recoltare.kg_cal2 ?? 0)
+    return kgCal1 + kgCal2
+  }
+
+  const totalCantitateKg = useMemo(
+    () => filteredRecoltari.reduce((sum, r) => sum + getRecoltareKg(r), 0),
+    [filteredRecoltari]
+  )
 
   return (
     <AppShell
-      header={<PageHeader title="Recoltari" subtitle="Evidenta productiei recoltate" rightSlot={<Package className="h-5 w-5" />} />}
-      fab={<Fab onClick={() => setAddOpen(true)} label="Adauga recoltare" />}
+      header={<PageHeader title="Recoltări" subtitle="Evidența producției recoltate" rightSlot={<Package className="h-5 w-5" />} />}
+      fab={initialError ? undefined : <Fab onClick={() => setAddOpen(true)} label="Adaugă recoltare" />}
       bottomBar={
         <StickyActionBar>
           <div className="flex items-center justify-between gap-3">
@@ -97,13 +111,14 @@ export function RecoltariPageClient({ initialRecoltari, parcele }: RecoltariPage
       }
     >
       <div className="mx-auto w-full max-w-4xl space-y-4 py-4">
-        <Input className="agri-control h-12" placeholder="Cauta dupa parcela sau observatii..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <Input className="agri-control h-12" placeholder="Caută după parcelă sau observații..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
 
-        {isError ? <ErrorState title="Eroare" message={(error as Error).message} /> : null}
-        {isLoading ? <LoadingState label="Se incarca recoltarile..." /> : null}
-        {!isLoading && !isError && filteredRecoltari.length === 0 ? <EmptyState title="Nu exista recoltari" /> : null}
+        {initialError ? <ErrorState title="Eroare" message={initialError} /> : null}
+        {isError && !initialError ? <ErrorState title="Eroare" message={(error as Error).message} /> : null}
+        {isLoading ? <LoadingState label="Se încarcă recoltările..." /> : null}
+        {!isLoading && !isError && !initialError && filteredRecoltari.length === 0 ? <EmptyState title="Nu există recoltări" /> : null}
 
-        {!isLoading && !isError && filteredRecoltari.length > 0 ? (
+        {!isLoading && !isError && !initialError && filteredRecoltari.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {filteredRecoltari.map((recoltare) => (
               <RecoltareCard
@@ -136,8 +151,12 @@ export function RecoltariPageClient({ initialRecoltari, parcele }: RecoltariPage
         onConfirm={() => {
           if (deletingRecoltare) deleteMutation.mutate(deletingRecoltare.id)
         }}
-        itemName={deletingRecoltare?.data ? `din ${new Date(deletingRecoltare.data).toLocaleDateString('ro-RO')}` : ''}
+        itemName={buildRecoltareDeleteLabel(
+          deletingRecoltare,
+          deletingRecoltare?.parcela_id ? parcelaMap[deletingRecoltare.parcela_id] : ''
+        )}
         itemType="recoltare"
+        description="Recoltarea selectată va fi ștearsă definitiv."
       />
     </AppShell>
   )

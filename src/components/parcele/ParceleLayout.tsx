@@ -12,6 +12,7 @@ import { Fab } from '@/components/parcele/Fab'
 import { ParcelaCard } from '@/components/parcele/ParcelaCard'
 import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog'
 import { CompactPageHeader } from '@/components/layout/CompactPageHeader'
+import { buildParcelaDeleteLabel } from '@/lib/ui/delete-labels'
 
 interface ParceleLayoutProps {
   initialParcele: Parcela[]
@@ -111,7 +112,9 @@ export function ParceleLayout({ initialParcele }: ParceleLayoutProps) {
       <DeleteConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        parcelaNume={selectedParcela?.nume_parcela || ''}
+        itemName={buildParcelaDeleteLabel(selectedParcela)}
+        itemType="Parcela"
+        description="Parcela selectata va fi stearsa definitiv."
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!selectedParcela) return

@@ -4,22 +4,22 @@
 // DO NOT EXPOSE TO PRODUCTION ROUTES
 // ============================================================================
 
-import { createClient } from '@/lib/supabase/client';
+import { getSupabase } from '@/lib/supabase/client';
 
 export async function testRLSAutoPopulation() {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
-  console.log('🔍 Starting RLS Check...');
+  console.log('đź”Ť Starting RLS Check...');
 
   // 1. Get current user
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   
   if (userError || !user) {
-    console.error('❌ User not authenticated:', userError);
+    console.error('âťŚ User not authenticated:', userError);
     return { success: false, error: 'User not authenticated' };
   }
 
-  console.log('✅ Authenticated user:', user.id);
+  console.log('âś… Authenticated user:', user.id);
 
   // 2. Get user's tenant
   const { data: tenant, error: tenantError } = await supabase
@@ -29,11 +29,11 @@ export async function testRLSAutoPopulation() {
     .single();
 
   if (tenantError || !tenant) {
-    console.error('❌ Tenant not found:', tenantError);
+    console.error('âťŚ Tenant not found:', tenantError);
     return { success: false, error: 'Tenant not found' };
   }
 
-  console.log('✅ User tenant_id:', tenant.id);
+  console.log('âś… User tenant_id:', tenant.id);
 
   // 3. Insert a test client record WITHOUT tenant_id
   const testClientName = `RLS_TEST_${Date.now()}`;
@@ -41,7 +41,8 @@ export async function testRLSAutoPopulation() {
   const { data: insertedClient, error: insertError } = await supabase
     .from('clienti')
     .insert({
-      nume: testClientName,
+      id_client: `RLS${Date.now()}`,
+      nume_client: testClientName,
       telefon: '0700000000',
       email: 'rls-test@example.com',
       // NOTE: tenant_id is NOT included - should be auto-populated by trigger/RLS
@@ -50,15 +51,15 @@ export async function testRLSAutoPopulation() {
     .single();
 
   if (insertError) {
-    console.error('❌ Insert failed:', insertError);
+    console.error('âťŚ Insert failed:', insertError);
     return { success: false, error: insertError.message };
   }
 
-  console.log('✅ Record inserted:', insertedClient);
+  console.log('âś… Record inserted:', insertedClient);
 
   // 4. Check if tenant_id was auto-populated
   if (!insertedClient.tenant_id) {
-    console.error('❌ tenant_id was NOT auto-populated!');
+    console.error('âťŚ tenant_id was NOT auto-populated!');
     return { 
       success: false, 
       error: 'tenant_id not auto-populated',
@@ -67,7 +68,7 @@ export async function testRLSAutoPopulation() {
   }
 
   if (insertedClient.tenant_id !== tenant.id) {
-    console.error('❌ tenant_id mismatch!');
+    console.error('âťŚ tenant_id mismatch!');
     console.error('Expected:', tenant.id);
     console.error('Got:', insertedClient.tenant_id);
     return { 
@@ -78,18 +79,18 @@ export async function testRLSAutoPopulation() {
     };
   }
 
-  console.log('✅ tenant_id correctly auto-populated:', insertedClient.tenant_id);
+  console.log('âś… tenant_id correctly auto-populated:', insertedClient.tenant_id);
 
   // 5. Verify we can only see our own records (RLS SELECT policy)
   const { data: allClients, error: selectError } = await supabase
     .from('clienti')
-    .select('*');
+    .select('id,tenant_id');
 
   if (selectError) {
-    console.error('❌ Select failed:', selectError);
+    console.error('âťŚ Select failed:', selectError);
   } else {
-    const ourClients = allClients?.filter(c => c.tenant_id === tenant.id);
-    console.log(`✅ RLS SELECT working: ${ourClients?.length}/${allClients?.length} records visible`);
+    const ourClients = allClients?.filter((c: { tenant_id: string | null }) => c.tenant_id === tenant.id);
+    console.log(`âś… RLS SELECT working: ${ourClients?.length}/${allClients?.length} records visible`);
   }
 
   // 6. Clean up test record
@@ -99,9 +100,9 @@ export async function testRLSAutoPopulation() {
     .eq('id', insertedClient.id);
 
   if (deleteError) {
-    console.warn('⚠️ Failed to clean up test record:', deleteError);
+    console.warn('âš ď¸Ź Failed to clean up test record:', deleteError);
   } else {
-    console.log('✅ Test record cleaned up');
+    console.log('âś… Test record cleaned up');
   }
 
   return {
@@ -117,3 +118,6 @@ export async function testRLSAutoPopulation() {
 if (typeof window !== 'undefined') {
   (window as any).testRLS = testRLSAutoPopulation;
 }
+
+
+

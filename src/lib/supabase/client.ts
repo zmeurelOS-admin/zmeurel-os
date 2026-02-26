@@ -1,10 +1,24 @@
-// src/lib/supabase/client.ts
 import { createBrowserClient } from '@supabase/ssr'
+import type { Database } from '@/types/supabase'
 
-export function createClient() {
-  // Acest client se folosește în componentele cu "use client"
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+let supabaseInstance: ReturnType<typeof createBrowserClient<Database>> | null = null
+
+export function getSupabase() {
+  if (!supabaseInstance) {
+    supabaseInstance = createBrowserClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          flowType: 'pkce',
+        },
+      }
+    )
+  }
+
+  return supabaseInstance
 }
+

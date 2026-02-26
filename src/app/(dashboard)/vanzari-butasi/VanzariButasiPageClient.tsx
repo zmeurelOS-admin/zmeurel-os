@@ -21,6 +21,7 @@ import {
   getVanzariButasi,
   type VanzareButasi,
 } from '@/lib/supabase/queries/vanzari-butasi'
+import { buildButasiOrderDeleteLabel } from '@/lib/ui/delete-labels'
 
 interface Client {
   id: string
@@ -36,6 +37,10 @@ interface VanzariButasiPageClientProps {
   initialVanzari: VanzareButasi[]
   clienti: Client[]
   parcele: Parcela[]
+}
+
+function formatLei(value: number): string {
+  return `${value.toFixed(2)} lei`
 }
 
 export function VanzariButasiPageClient({ initialVanzari, clienti, parcele }: VanzariButasiPageClientProps) {
@@ -61,7 +66,7 @@ export function VanzariButasiPageClient({ initialVanzari, clienti, parcele }: Va
     mutationFn: deleteVanzareButasi,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vanzari-butasi'] })
-      toast.success('Vanzare stearsa')
+      toast.success('Comandă ștearsă')
       setDeletingVanzare(null)
     },
     onError: (err: Error) => {
@@ -89,37 +94,53 @@ export function VanzariButasiPageClient({ initialVanzari, clienti, parcele }: Va
     if (!searchTerm) return vanzari
     const term = searchTerm.toLowerCase()
 
-    return vanzari.filter(
-      (vb) =>
-        vb.soi_butasi?.toLowerCase().includes(term) ||
-        (vb.client_id && clientMap[vb.client_id]?.toLowerCase().includes(term)) ||
-        vb.observatii?.toLowerCase().includes(term)
-    )
+    return vanzari.filter((order) => {
+      const clientName = order.client_id ? clientMap[order.client_id]?.toLowerCase() : ''
+      const itemNames = order.items.map((item) => item.soi.toLowerCase()).join(' ')
+      return (
+        order.status.toLowerCase().includes(term) ||
+        clientName?.includes(term) ||
+        order.observatii?.toLowerCase().includes(term) ||
+        order.adresa_livrare?.toLowerCase().includes(term) ||
+        itemNames.includes(term)
+      )
+    })
   }, [vanzari, searchTerm, clientMap])
 
-  const totalVenit = useMemo(
-    () => filteredVanzari.reduce((sum, vb) => sum + vb.cantitate_butasi * vb.pret_unitar_lei, 0),
+  const totalComenzi = useMemo(
+    () => filteredVanzari.reduce((sum, order) => sum + Number(order.total_lei), 0),
+    [filteredVanzari]
+  )
+
+  const restTotal = useMemo(
+    () => filteredVanzari.reduce((sum, order) => sum + (Number(order.total_lei) - Number(order.avans_suma)), 0),
     [filteredVanzari]
   )
 
   return (
     <AppShell
-      header={<PageHeader title="Vanzari Butasi" subtitle="Gestionare vanzari material saditor" />}
-      fab={<Fab onClick={() => setAddOpen(true)} label="Adauga vanzare butasi" />}
+      header={<PageHeader title="Vânzări Butași" subtitle="Gestionare comenzi material săditor" />}
+      fab={<Fab onClick={() => setAddOpen(true)} label="Adaugă comandă butași" />}
       bottomBar={
         <StickyActionBar>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-[var(--agri-text-muted)]">Venit total: {totalVenit.toFixed(2)} lei</p>
+            <p className="text-sm font-medium text-[var(--agri-text-muted)]">Total comenzi: {formatLei(totalComenzi)}</p>
+            <p className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Rest total: {formatLei(restTotal)}</p>
           </div>
         </StickyActionBar>
       }
     >
       <div className="mx-auto w-full max-w-4xl space-y-4 py-4">
-        <Input className="agri-control h-12" placeholder="Cauta dupa soi, client sau observatii..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <Input
+          className="agri-control h-12"
+          placeholder="Caută după client, status, soi sau observații..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
 
         {isError ? <ErrorState title="Eroare" message={(error as Error).message} /> : null}
-        {isLoading ? <LoadingState label="Se incarca vanzarile..." /> : null}
-        {!isLoading && !isError && filteredVanzari.length === 0 ? <EmptyState title="Nu exista vanzari" /> : null}
+        {isLoading ? <LoadingState label="Se încarcă comenzile..." /> : null}
+        {!isLoading && !isError && filteredVanzari.length === 0 ? <EmptyState title="Nu există comenzi" /> : null}
 
         {!isLoading && !isError && filteredVanzari.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -142,21 +163,25 @@ export function VanzariButasiPageClient({ initialVanzari, clienti, parcele }: Va
       <EditVanzareButasiDialog
         vanzare={editingVanzare}
         open={!!editingVanzare}
-        onOpenChange={(open) => {
-          if (!open) setEditingVanzare(null)
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setEditingVanzare(null)
         }}
       />
 
       <DeleteConfirmDialog
         open={!!deletingVanzare}
-        onOpenChange={(open) => {
-          if (!open) setDeletingVanzare(null)
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setDeletingVanzare(null)
         }}
         onConfirm={() => {
           if (deletingVanzare) deleteMutation.mutate(deletingVanzare.id)
         }}
-        itemName={deletingVanzare?.data ? `din ${new Date(deletingVanzare.data).toLocaleDateString('ro-RO')}` : ''}
-        itemType="vanzare"
+        itemName={buildButasiOrderDeleteLabel(
+          deletingVanzare,
+          deletingVanzare?.client_id ? clientMap[deletingVanzare.client_id] : ''
+        )}
+        itemType="comanda"
+        description="Comanda selectată va fi ștearsă definitiv."
       />
     </AppShell>
   )

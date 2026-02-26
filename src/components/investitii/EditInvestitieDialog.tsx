@@ -9,11 +9,8 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  AppDialog,
+} from '@/components/app/AppDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -131,15 +128,33 @@ export function EditInvestitieDialog({
   if (!investitie) return null
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-white">
-        <DialogHeader>
-          <DialogTitle>
-            Editeaza investitie
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+    <AppDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Editeaza investitie"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Anuleaza
+          </Button>
+          <Button
+            type="submit"
+            form="edit-investitie-form"
+            disabled={updateMutation.isPending}
+            className="bg-[#F16B6B] hover:bg-[#E05A5A]"
+          >
+            {updateMutation.isPending
+              ? 'Se salveaza...'
+              : 'Salveaza'}
+          </Button>
+        </>
+      }
+    >
+        <form id="edit-investitie-form" onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <div>
             <Label>Data</Label>
             <Input type="date" {...register('data')} />
@@ -190,26 +205,7 @@ export function EditInvestitieDialog({
             <Textarea rows={2} {...register('descriere')} />
           </div>
 
-          <div className="flex justify-end gap-3 pt-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              AnuleazÄ
-            </Button>
-            <Button
-              type="submit"
-              disabled={updateMutation.isPending}
-              className="bg-[#F16B6B] hover:bg-[#E05A5A]"
-            >
-              {updateMutation.isPending
-                ? 'Se salveazÄ...'
-                : 'SalveazÄ'}
-            </Button>
-          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+    </AppDialog>
   )
 }

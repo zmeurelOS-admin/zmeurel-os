@@ -1,23 +1,37 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
+import * as Sentry from '@sentry/nextjs'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
-import { useForm } from 'react-hook-form'
+import { CalendarDays, Loader2, Minus, Plus, Trash2 } from 'lucide-react'
+import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
+import * as z from 'zod'
 
 import { AppDialog } from '@/components/app/AppDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 import { getClienti } from '@/lib/supabase/queries/clienti'
 import { getParcele } from '@/lib/supabase/queries/parcele'
 import {
+  VANZARE_BUTASI_STATUSES,
   type UpdateVanzareButasiInput,
   type VanzareButasi,
+  type VanzareButasiStatus,
   updateVanzareButasi,
 } from '@/lib/supabase/queries/vanzari-butasi'
+import { cn } from '@/lib/utils'
 
 interface EditVanzareButasiDialogProps {
   vanzare: VanzareButasi | null
@@ -25,42 +39,97 @@ interface EditVanzareButasiDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-interface EditFormValues {
-  data: string
-  client_id: string
-  parcela_sursa_id: string
-  soi_butasi: string
-  cantitate_butasi: number
-  pret_unitar_lei: number
-  observatii: string
+const statusLabels: Record<VanzareButasiStatus, string> = {
+  noua: 'Noua',
+  confirmata: 'Confirmata',
+  pregatita: 'Pregatita',
+  livrata: 'Livrata',
+  anulata: 'Anulata',
+}
+
+const schema = z.object({
+  client_id: z.string().optional(),
+  parcela_sursa_id: z.string().optional(),
+  status: z.enum(VANZARE_BUTASI_STATUSES),
+  data_comanda: z.string().min(1, 'Data comenzii este obligatorie'),
+  data_livrare_estimata: z.string().optional(),
+  adresa_livrare: z.string().optional(),
+  observatii: z.string().optional(),
+  avans_suma: z.coerce.number().min(0, 'Avansul nu poate fi negativ'),
+  avans_data: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        soi: z.string().trim().min(1, 'Soiul este obligatoriu'),
+        cantitate: z.coerce.number().int().min(1, 'Cantitatea trebuie sa fie > 0'),
+        pret_unitar: z.coerce.number().gt(0, 'Pretul trebuie sa fie > 0'),
+      })
+    )
+    .min(1, 'Adauga cel putin un produs'),
+})
+
+type FormValues = z.input<typeof schema>
+type SubmitValues = z.output<typeof schema>
+
+function formatLei(value: number): string {
+  return `${value.toFixed(2)} lei`
+}
+
+function getDefaultValues(vanzare: VanzareButasi): FormValues {
+  return {
+    client_id: vanzare.client_id ?? '',
+    parcela_sursa_id: vanzare.parcela_sursa_id ?? '',
+    status: vanzare.status,
+    data_comanda: vanzare.data_comanda || vanzare.data,
+    data_livrare_estimata: vanzare.data_livrare_estimata ?? '',
+    adresa_livrare: vanzare.adresa_livrare ?? '',
+    observatii: vanzare.observatii ?? '',
+    avans_suma: Number(vanzare.avans_suma ?? 0),
+    avans_data: vanzare.avans_data ?? '',
+    items:
+      vanzare.items?.length > 0
+        ? vanzare.items.map((item) => ({
+            soi: item.soi,
+            cantitate: item.cantitate,
+            pret_unitar: item.pret_unitar,
+          }))
+        : [
+            {
+              soi: vanzare.soi_butasi ?? '',
+              cantitate: Math.max(1, Number(vanzare.cantitate_butasi || 1)),
+              pret_unitar: Math.max(0.01, Number(vanzare.pret_unitar_lei || 0.01)),
+            },
+          ],
+  }
 }
 
 export function EditVanzareButasiDialog({ vanzare, open, onOpenChange }: EditVanzareButasiDialogProps) {
   const queryClient = useQueryClient()
 
-  const form = useForm<EditFormValues>({
+  const form = useForm<FormValues, unknown, SubmitValues>({
+    resolver: zodResolver(schema),
     defaultValues: {
-      data: '',
       client_id: '',
       parcela_sursa_id: '',
-      soi_butasi: '',
-      cantitate_butasi: 0,
-      pret_unitar_lei: 0,
+      status: 'noua',
+      data_comanda: '',
+      data_livrare_estimata: '',
+      adresa_livrare: '',
       observatii: '',
+      avans_suma: 0,
+      avans_data: '',
+      items: [{ soi: '', cantitate: 1, pret_unitar: 0 }],
     },
+  })
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'items',
   })
 
   useEffect(() => {
     if (vanzare && open) {
-      form.reset({
-        data: vanzare.data,
-        client_id: vanzare.client_id ?? '',
-        parcela_sursa_id: vanzare.parcela_sursa_id ?? '',
-        soi_butasi: vanzare.soi_butasi,
-        cantitate_butasi: vanzare.cantitate_butasi,
-        pret_unitar_lei: vanzare.pret_unitar_lei,
-        observatii: vanzare.observatii ?? '',
-      })
+      form.reset(getDefaultValues(vanzare))
     }
   }, [vanzare, open, form])
 
@@ -74,11 +143,53 @@ export function EditVanzareButasiDialog({ vanzare, open, onOpenChange }: EditVan
     queryFn: getParcele,
   })
 
+  const watchedItems = form.watch('items')
+  const status = form.watch('status')
+  const isProductsReadonly = status === 'anulata'
+
+  const totalProduse = useMemo(
+    () => watchedItems.reduce((sum, item) => sum + Number(item.cantitate || 0) * Number(item.pret_unitar || 0), 0),
+    [watchedItems]
+  )
+
+  const avans = Number(form.watch('avans_suma') ?? 0)
+  const restDeIncasat = totalProduse - (Number.isFinite(avans) ? avans : 0)
+
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateVanzareButasiInput }) => updateVanzareButasi(id, input),
-    onSuccess: () => {
+    onSuccess: (updatedOrder) => {
+      if (!vanzare) return
+
       queryClient.invalidateQueries({ queryKey: ['vanzari-butasi'] })
-      toast.success('Vanzare actualizata')
+
+      if (updatedOrder.status !== vanzare.status) {
+        trackEvent('butasi_order_status_changed', 'vanzari-butasi', {
+          orderId: updatedOrder.id,
+          from: vanzare.status,
+          to: updatedOrder.status,
+        })
+        Sentry.captureMessage('butasi_order_status_changed', {
+          level: 'info',
+          tags: { module: 'vanzari-butasi' },
+          extra: { orderId: updatedOrder.id, from: vanzare.status, to: updatedOrder.status },
+        })
+      }
+
+      const avansDelta = Number(updatedOrder.avans_suma) - Number(vanzare.avans_suma)
+      if (avansDelta > 0) {
+        trackEvent('butasi_order_payment_added', 'vanzari-butasi', {
+          orderId: updatedOrder.id,
+          addedAmount: avansDelta,
+          newAvans: updatedOrder.avans_suma,
+        })
+        Sentry.captureMessage('butasi_order_payment_added', {
+          level: 'info',
+          tags: { module: 'vanzari-butasi' },
+          extra: { orderId: updatedOrder.id, addedAmount: avansDelta, newAvans: updatedOrder.avans_suma },
+        })
+      }
+
+      toast.success('Comanda actualizata')
       onOpenChange(false)
     },
     onError: (error: Error) => {
@@ -86,19 +197,26 @@ export function EditVanzareButasiDialog({ vanzare, open, onOpenChange }: EditVan
     },
   })
 
-  const onSubmit = (values: EditFormValues) => {
+  const onSubmit = (values: SubmitValues) => {
     if (!vanzare || updateMutation.isPending) return
 
     updateMutation.mutate({
       id: vanzare.id,
       input: {
-        data: values.data,
         client_id: values.client_id || null,
         parcela_sursa_id: values.parcela_sursa_id || null,
-        soi_butasi: values.soi_butasi.trim(),
-        cantitate_butasi: Number(values.cantitate_butasi),
-        pret_unitar_lei: Number(values.pret_unitar_lei),
+        status: values.status,
+        data_comanda: values.data_comanda,
+        data_livrare_estimata: values.data_livrare_estimata || null,
+        adresa_livrare: values.adresa_livrare?.trim() || null,
         observatii: values.observatii?.trim() || null,
+        avans_suma: Number(values.avans_suma),
+        avans_data: values.avans_data || null,
+        items: values.items.map((item) => ({
+          soi: item.soi.trim(),
+          cantitate: Number(item.cantitate),
+          pret_unitar: Number(item.pret_unitar),
+        })),
       },
     })
   }
@@ -109,7 +227,7 @@ export function EditVanzareButasiDialog({ vanzare, open, onOpenChange }: EditVan
     <AppDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Editeaza vanzare butasi"
+      title="Editeaza comanda butasi"
       footer={
         <div className="grid grid-cols-2 gap-3">
           <Button type="button" variant="outline" className="agri-cta" onClick={() => onOpenChange(false)}>
@@ -121,76 +239,255 @@ export function EditVanzareButasiDialog({ vanzare, open, onOpenChange }: EditVan
             onClick={form.handleSubmit(onSubmit)}
             disabled={updateMutation.isPending}
           >
-            {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salveaza'}
+            {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salveaza comanda'}
           </Button>
         </div>
       }
     >
-      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="space-y-2">
-          <Label htmlFor="edit_vb_data">Data</Label>
-          <Input id="edit_vb_data" type="date" className="agri-control h-12" {...form.register('data')} />
-        </div>
+      <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
+        <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Client</Label>
+              <Controller
+                control={form.control}
+                name="client_id"
+                render={({ field }) => (
+                  <Select value={field.value || '__none'} onValueChange={(value) => field.onChange(value === '__none' ? '' : value)}>
+                    <SelectTrigger className="agri-control h-12">
+                      <SelectValue placeholder="Selecteaza client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Fara client</SelectItem>
+                      {clienti.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.nume_client}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="edit_vb_soi">Soi butasi</Label>
-          <Input id="edit_vb_soi" className="agri-control h-12" {...form.register('soi_butasi')} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label htmlFor="edit_vb_qty">Cantitate</Label>
-            <Input
-              id="edit_vb_qty"
-              type="number"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              min="1"
-              className="agri-control h-12"
-              {...form.register('cantitate_butasi', { valueAsNumber: true })}
-            />
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {VANZARE_BUTASI_STATUSES.map((option) => {
+                  const isActive = status === option
+                  return (
+                    <Button
+                      key={option}
+                      type="button"
+                      variant="outline"
+                      onClick={() => form.setValue('status', option, { shouldDirty: true })}
+                      className={cn(
+                        'h-10 rounded-full border text-xs font-semibold',
+                        isActive && option !== 'anulata' && 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700',
+                        isActive && option === 'anulata' && 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200',
+                        !isActive && 'bg-white text-slate-600'
+                      )}
+                    >
+                      {statusLabels[option]}
+                    </Button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit_vb_pret">Pret/buc (lei)</Label>
-            <Input
-              id="edit_vb_pret"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0.01"
-              className="agri-control h-12"
-              {...form.register('pret_unitar_lei', { valueAsNumber: true })}
-            />
+        </div>
+
+        <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit_vb_data_comanda">Data comanda</Label>
+              <div className="relative">
+                <CalendarDays className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input id="edit_vb_data_comanda" type="date" className="agri-control h-12 pl-10" {...form.register('data_comanda')} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_vb_data_livrare">Data preconizata livrare</Label>
+              <div className="relative">
+                <CalendarDays className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input id="edit_vb_data_livrare" type="date" className="agri-control h-12 pl-10" {...form.register('data_livrare_estimata')} />
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="edit_vb_client">Client</Label>
-          <select id="edit_vb_client" className="agri-control h-12 w-full px-3 text-base" {...form.register('client_id')}>
-            <option value="">Fara client</option>
-            {clienti.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.nume_client}
-              </option>
-            ))}
-          </select>
+        <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="edit_vb_adresa">Adresa livrare</Label>
+              <Input id="edit_vb_adresa" className="agri-control h-12" {...form.register('adresa_livrare')} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_vb_obs">Observatii</Label>
+              <Textarea id="edit_vb_obs" rows={4} className="agri-control" {...form.register('observatii')} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Parcela sursa</Label>
+              <Controller
+                control={form.control}
+                name="parcela_sursa_id"
+                render={({ field }) => (
+                  <Select value={field.value || '__none'} onValueChange={(value) => field.onChange(value === '__none' ? '' : value)}>
+                    <SelectTrigger className="agri-control h-12">
+                      <SelectValue placeholder="Selecteaza parcela" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Fara parcela</SelectItem>
+                      {parcele.map((parcela) => (
+                        <SelectItem key={parcela.id} value={parcela.id}>
+                          {parcela.nume_parcela}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="edit_vb_parcela">Parcela sursa</Label>
-          <select id="edit_vb_parcela" className="agri-control h-12 w-full px-3 text-base" {...form.register('parcela_sursa_id')}>
-            <option value="">Fara parcela</option>
-            {parcele.map((parcela) => (
-              <option key={parcela.id} value={parcela.id}>
-                {parcela.nume_parcela}
-              </option>
-            ))}
-          </select>
+        <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-[var(--agri-text)]">Produse</h3>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full"
+              onClick={() => append({ soi: '', cantitate: 1, pret_unitar: 0 })}
+              disabled={isProductsReadonly}
+            >
+              + Adauga soi
+            </Button>
+          </div>
+
+          {isProductsReadonly ? (
+            <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+              Comanda anulata: produsele sunt doar in citire.
+            </div>
+          ) : null}
+
+          <div className="space-y-3">
+            {fields.map((field, index) => {
+              const cantitate = Number(watchedItems[index]?.cantitate || 0)
+              const pret = Number(watchedItems[index]?.pret_unitar || 0)
+              const subtotal = cantitate * pret
+
+              return (
+                <div key={field.id} className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+                  <div className="grid gap-3 md:grid-cols-12">
+                    <div className="space-y-2 md:col-span-4">
+                      <Label>Soi</Label>
+                      <Input className="agri-control h-11" disabled={isProductsReadonly} {...form.register(`items.${index}.soi`)} />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-3">
+                      <Label>Cantitate</Label>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="h-10 w-10 rounded-full"
+                          disabled={isProductsReadonly}
+                          onClick={() => {
+                            const nextValue = Math.max(1, cantitate - 1)
+                            form.setValue(`items.${index}.cantitate`, nextValue, { shouldValidate: true })
+                          }}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min={1}
+                          className="agri-control h-11 text-center"
+                          disabled={isProductsReadonly}
+                          {...form.register(`items.${index}.cantitate`, { valueAsNumber: true })}
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="h-10 w-10 rounded-full"
+                          disabled={isProductsReadonly}
+                          onClick={() => form.setValue(`items.${index}.cantitate`, cantitate + 1, { shouldValidate: true })}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-3">
+                      <Label>Pret/buc</Label>
+                      <Input
+                        type="number"
+                        min={0.01}
+                        step="0.01"
+                        className="agri-control h-11"
+                        disabled={isProductsReadonly}
+                        {...form.register(`items.${index}.pret_unitar`, { valueAsNumber: true })}
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Total linie</Label>
+                      <div className="flex h-11 items-center justify-between rounded-xl border border-emerald-100 bg-white px-3 text-sm font-semibold">
+                        {formatLei(subtotal || 0)}
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 rounded-full text-red-600 hover:bg-red-100"
+                          onClick={() => {
+                            if (fields.length > 1) {
+                              remove(index)
+                            }
+                          }}
+                          disabled={fields.length === 1 || isProductsReadonly}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="edit_vb_obs">Observatii</Label>
-          <Textarea id="edit_vb_obs" rows={4} className="agri-control w-full px-3 py-2 text-base" {...form.register('observatii')} />
+        <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+          <div className="space-y-3">
+            <p className="text-lg font-bold text-[var(--agri-text)]">Total produse: {formatLei(totalProduse || 0)}</p>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit_vb_avans">Avans platit</Label>
+                <Input
+                  id="edit_vb_avans"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="agri-control h-12"
+                  {...form.register('avans_suma', { valueAsNumber: true })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_vb_avans_data">Data avans</Label>
+                <Input id="edit_vb_avans_data" type="date" className="agri-control h-12" {...form.register('avans_data')} />
+              </div>
+            </div>
+
+            <div className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
+              Rest de incasat: {formatLei(restDeIncasat || 0)}
+            </div>
+          </div>
         </div>
       </form>
     </AppDialog>

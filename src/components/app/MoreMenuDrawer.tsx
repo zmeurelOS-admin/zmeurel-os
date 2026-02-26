@@ -2,46 +2,101 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { BarChart3, LayoutDashboard, Leaf, LogOut, MapPin, Settings, ShoppingBag, Users, Wallet } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Archive,
+  BarChart3,
+  ClipboardList,
+  LayoutDashboard,
+  Leaf,
+  LogOut,
+  MapPin,
+  Settings,
+  ShieldCheck,
+  ShoppingBag,
+  Users,
+  UsersRound,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { AppDrawer } from '@/components/app/AppDrawer'
-import { useDensity } from '@/components/app/DensityProvider'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
+import { isSuperAdmin } from '@/lib/auth/isSuperAdmin'
+import { getSupabase } from '@/lib/supabase/client'
 
 interface MoreMenuDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-const groups = [
+type MenuItem = {
+  href: string
+  label: string
+  icon: LucideIcon
+}
+
+type MenuGroup = {
+  title: string
+  items: MenuItem[]
+  badge?: string
+}
+
+const groups: MenuGroup[] = [
   {
-    title: 'Operatiuni',
+    title: 'Operațiuni',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/parcele', label: 'Parcele', icon: MapPin },
-      { href: '/vanzari-butasi', label: 'Vanzari butasi', icon: ShoppingBag },
+      { href: '/stocuri', label: 'Stocuri', icon: Archive },
+      { href: '/vanzari-butasi', label: 'Vânzări butași', icon: ShoppingBag },
     ],
   },
   {
     title: 'Administrare',
     items: [
-      { href: '/clienti', label: 'Clienti', icon: Users },
-      { href: '/culegatori', label: 'Culegatori', icon: Leaf },
+      { href: '/clienti', label: 'Clienți', icon: Users },
+      { href: '/culegatori', label: 'Culegători', icon: Leaf },
       { href: '/rapoarte', label: 'Rapoarte', icon: BarChart3 },
       { href: '/planuri', label: 'Planuri', icon: Wallet },
     ],
   },
 ]
 
+const adminGroup: MenuGroup = {
+  title: 'Admin (Zmeurel)',
+  badge: 'Admin',
+  items: [
+    { href: '/admin/analytics', label: 'Analytics global (agregat)', icon: BarChart3 },
+    { href: '/admin', label: 'Planuri / Pricing', icon: Wallet },
+    { href: '/admin/audit', label: 'Audit planuri', icon: ClipboardList },
+    { href: '/admin', label: 'Listă tenanți', icon: UsersRound },
+  ],
+}
+
 export function MoreMenuDrawer({ open, onOpenChange }: MoreMenuDrawerProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { density, setDensity } = useDensity()
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false)
+
+  useEffect(() => {
+    void (async () => {
+      const supabase = getSupabase()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setIsSuperAdminUser(user?.id ? await isSuperAdmin(supabase, user.id) : false)
+    })()
+  }, [])
+
+  const sections = useMemo(() => {
+    if (!isSuperAdminUser) return groups
+    return [...groups, adminGroup]
+  }, [isSuperAdminUser])
 
   const handleLogout = async () => {
-    const supabase = createClient()
+    const supabase = getSupabase()
     await supabase.auth.signOut()
     onOpenChange(false)
     router.push('/login')
@@ -51,9 +106,17 @@ export function MoreMenuDrawer({ open, onOpenChange }: MoreMenuDrawerProps) {
   return (
     <AppDrawer open={open} onOpenChange={onOpenChange} title="Mai multe module">
       <div className="space-y-6">
-        {groups.map((group) => (
+        {sections.map((group) => (
           <section key={group.title} className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--agri-text-muted)]">{group.title}</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--agri-text-muted)]">{group.title}</h3>
+              {'badge' in group ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                  <ShieldCheck className="h-3 w-3" />
+                  {group.badge}
+                </span>
+              ) : null}
+            </div>
             <div className="space-y-2">
               {group.items.map((item) => {
                 const active = pathname.startsWith(item.href)
@@ -61,7 +124,7 @@ export function MoreMenuDrawer({ open, onOpenChange }: MoreMenuDrawerProps) {
 
                 return (
                   <Link
-                    key={item.href}
+                    key={`${group.title}-${item.href}-${item.label}`}
                     href={item.href}
                     onClick={() => onOpenChange(false)}
                     className={`agri-control flex h-12 items-center gap-3 px-3 text-sm font-semibold ${
@@ -78,7 +141,7 @@ export function MoreMenuDrawer({ open, onOpenChange }: MoreMenuDrawerProps) {
         ))}
 
         <section className="space-y-2">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--agri-text-muted)]">Cont & Setari</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--agri-text-muted)]">Cont & Setări</h3>
           <div className="space-y-2">
             <Link
               href="/settings#profil"
@@ -89,46 +152,6 @@ export function MoreMenuDrawer({ open, onOpenChange }: MoreMenuDrawerProps) {
               Profil utilizator
             </Link>
 
-            <Link
-              href="/settings#password"
-              onClick={() => onOpenChange(false)}
-              className="agri-control flex h-12 items-center gap-3 px-3 text-sm font-semibold text-[var(--agri-text)]"
-            >
-              <Settings className="h-4 w-4" />
-              Schimba parola
-            </Link>
-
-            <Link
-              href="/settings#ferma"
-              onClick={() => onOpenChange(false)}
-              className="agri-control flex h-12 items-center gap-3 px-3 text-sm font-semibold text-[var(--agri-text)]"
-            >
-              <Settings className="h-4 w-4" />
-              Schimba ferma
-            </Link>
-
-            <div className="agri-control space-y-2 rounded-xl border p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--agri-text-muted)]">Densitate UI</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={density === 'compact' ? 'default' : 'outline'}
-                  className="h-10 text-xs"
-                  onClick={() => setDensity('compact')}
-                >
-                  Compact
-                </Button>
-                <Button
-                  type="button"
-                  variant={density === 'normal' ? 'default' : 'outline'}
-                  className="h-10 text-xs"
-                  onClick={() => setDensity('normal')}
-                >
-                  Normal
-                </Button>
-              </div>
-            </div>
-
             <Button
               type="button"
               variant="outline"
@@ -136,7 +159,7 @@ export function MoreMenuDrawer({ open, onOpenChange }: MoreMenuDrawerProps) {
               onClick={handleLogout}
             >
               <LogOut className="h-4 w-4" />
-              Delogare
+              Deconectare
             </Button>
           </div>
         </section>
@@ -144,3 +167,5 @@ export function MoreMenuDrawer({ open, onOpenChange }: MoreMenuDrawerProps) {
     </AppDrawer>
   )
 }
+
+

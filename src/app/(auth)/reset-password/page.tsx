@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { getSupabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = getSupabase();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,7 +24,7 @@ export default function ResetPasswordPage() {
     }
 
     if (password.length < 6) {
-      toast.error('Parola trebuie să aibă minim 6 caractere!');
+      toast.error('Parola trebuie sÄ aibÄ minim 6 caractere!');
       return;
     }
 
@@ -33,9 +33,9 @@ export default function ResetPasswordPage() {
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      toast.error('Eroare la schimbarea parolei. Încearcă din nou.');
+      toast.error('Eroare la schimbarea parolei. ĂŽncearcÄ din nou.');
     } else {
-      toast.success('Parola schimbată cu succes!');
+      toast.success('Parola schimbatÄ cu succes!');
       router.push('/dashboard');
     }
 
@@ -46,13 +46,13 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#312E3F]">🍓 Zmeurel OS</h1>
-          <p className="text-gray-500 mt-2">Setează o parolă nouă</p>
+          <h1 className="text-3xl font-bold text-[#312E3F]">đźŤ“ Zmeurel OS</h1>
+          <p className="text-gray-500 mt-2">SeteazÄ o parolÄ nouÄ</p>
         </div>
 
         <form onSubmit={handleReset} className="space-y-4">
           <div>
-            <Label htmlFor="password">Parolă nouă</Label>
+            <Label htmlFor="password">ParolÄ nouÄ</Label>
             <Input
               id="password"
               type="password"
@@ -64,11 +64,11 @@ export default function ResetPasswordPage() {
           </div>
 
           <div>
-            <Label htmlFor="confirm">Confirmă parola</Label>
+            <Label htmlFor="confirm">ConfirmÄ parola</Label>
             <Input
               id="confirm"
               type="password"
-              placeholder="Repetă parola"
+              placeholder="RepetÄ parola"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               required
@@ -80,10 +80,12 @@ export default function ResetPasswordPage() {
             className="w-full bg-[#F16B6B] hover:bg-[#e05555] text-white"
             disabled={loading}
           >
-            {loading ? 'Se salvează...' : 'Salvează parola'}
+            {loading ? 'Se salveazÄ...' : 'SalveazÄ parola'}
           </Button>
         </form>
       </div>
     </div>
   );
 }
+
+

@@ -16,6 +16,7 @@ import { AddParcelaDialog } from '@/components/parcele/AddParcelaDialog'
 import { EditParcelaDialog } from '@/components/parcele/EditParcelaDialog'
 import { DeleteConfirmDialog } from '@/components/parcele/DeleteConfirmDialog'
 import { ParcelaCard } from '@/components/parcele/ParcelaCard'
+import { buildParcelaDeleteLabel } from '@/lib/ui/delete-labels'
 
 interface ParcelaPageClientProps {
   initialParcele: Parcela[]
@@ -46,7 +47,7 @@ export function ParcelaPageClient({
   })
 
   return (
-    <div className="relative min-h-[100dvh] overflow-hidden bg-gray-50">
+    <div className="relative min-h-[100dvh] overflow-x-hidden bg-gray-50">
       <CompactPageHeader
         title="Parcele"
         subtitle="Administreaza terenurile cultivate."
@@ -115,7 +116,9 @@ export function ParcelaPageClient({
       <DeleteConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        parcelaNume={selectedParcela?.nume_parcela || ''}
+        itemName={buildParcelaDeleteLabel(selectedParcela)}
+        itemType="Parcela"
+        description="Parcela selectata va fi stearsa definitiv."
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (selectedParcela) {

@@ -1,6 +1,7 @@
 // src/app/(dashboard)/vanzari/page.tsx
 import { createClient } from '@/lib/supabase/server';
 import { VanzariPageClient } from './VanzariPageClient';
+import type { Vanzare } from '@/lib/supabase/queries/vanzari';
 
 export default async function VanzariPage() {
   const supabase = await createClient();
@@ -8,7 +9,7 @@ export default async function VanzariPage() {
   // RLS handles tenant isolation automatically - no manual auth check needed (middleware handles it)
   const { data: vanzari = [] } = await supabase
     .from('vanzari')
-    .select('*')
+    .select('id,id_vanzare,data,client_id,cantitate_kg,pret_lei_kg,status_plata,observatii_ladite,created_at,updated_at,tenant_id')
     .order('data', { ascending: false });
 
   const { data: clienti = [] } = await supabase
@@ -24,8 +25,9 @@ export default async function VanzariPage() {
 
   return (
     <VanzariPageClient
-      initialVanzari={vanzari || []}
+      initialVanzari={(vanzari ?? []) as unknown as Vanzare[]}
       clienti={mappedClienti}
     />
   );
 }
+

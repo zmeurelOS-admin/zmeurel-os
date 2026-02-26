@@ -1,14 +1,14 @@
 // src/lib/supabase/queries/investitii.ts
 
-import { createClient } from '../client'
+import { getSupabase } from '../client'
 
 // ===============================
 // CONSTANTS
 // ===============================
 
 export const CATEGORII_INVESTITII = [
-  'Butași',
-  'Sistem Irigație',
+  'ButaČ™i',
+  'Sistem IrigaČ›ie',
   'Solar / Tunel',
   'Utilaje',
   'Depozitare',
@@ -16,10 +16,10 @@ export const CATEGORII_INVESTITII = [
   'Altele',
 ] as const
 
-// 🔵 BADGE COLORS (pentru UI)
+// đź”µ BADGE COLORS (pentru UI)
 export const BADGE_COLORS: Record<string, string> = {
-  'Butași': 'bg-green-100 text-green-700',
-  'Sistem Irigație': 'bg-blue-100 text-blue-700',
+  'ButaČ™i': 'bg-green-100 text-green-700',
+  'Sistem IrigaČ›ie': 'bg-blue-100 text-blue-700',
   'Solar / Tunel': 'bg-purple-100 text-purple-700',
   Utilaje: 'bg-yellow-100 text-yellow-700',
   Depozitare: 'bg-indigo-100 text-indigo-700',
@@ -67,7 +67,7 @@ export interface UpdateInvestitieInput {
 // ===============================
 
 async function generateNextId(): Promise<string> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('investitii')
@@ -93,30 +93,30 @@ async function generateNextId(): Promise<string> {
 // ===============================
 
 export async function getInvestitii(): Promise<Investitie[]> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('investitii')
-    .select('*')
+    .select('id,id_investitie,data,parcela_id,categorie,furnizor,descriere,document_url,suma_lei,created_at,updated_at,tenant_id')
     .order('data', { ascending: false })
 
   if (error) throw error
 
-  return data ?? []
+  return (data ?? []) as unknown as Investitie[]
 }
 
 /**
  * CREATE INVESTITIE (RLS-FIRST)
  * 
- * 🔐 RLS REQUIREMENTS:
+ * đź” RLS REQUIREMENTS:
  * - tenant_id MUST be set automatically via BEFORE INSERT trigger OR RLS WITH CHECK policy
  * - INSERT policy must exist with WITH CHECK validating tenant_id matches current user's tenant
  * 
- * 📋 DB SCHEMA EXPECTATIONS:
+ * đź“‹ DB SCHEMA EXPECTATIONS:
  * - tenant_id: NOT NULL (required)
  * - tenant_id: No DEFAULT value (set via trigger)
  * 
- * 🔧 REQUIRED TRIGGER (if not using RLS WITH CHECK to set):
+ * đź”§ REQUIRED TRIGGER (if not using RLS WITH CHECK to set):
  * CREATE FUNCTION set_tenant_id_investitii()
  * RETURNS trigger AS $$
  * BEGIN
@@ -132,7 +132,7 @@ export async function getInvestitii(): Promise<Investitie[]> {
  * BEFORE INSERT ON investitii
  * FOR EACH ROW EXECUTE FUNCTION set_tenant_id_investitii();
  * 
- * 🔒 REQUIRED RLS POLICY:
+ * đź”’ REQUIRED RLS POLICY:
  * CREATE POLICY tenant_isolation_insert_investitii
  * ON investitii
  * FOR INSERT
@@ -146,7 +146,7 @@ export async function getInvestitii(): Promise<Investitie[]> {
 export async function createInvestitie(
   input: CreateInvestitieInput
 ): Promise<Investitie> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   const nextId = await generateNextId()
 
   const { data, error } = await supabase
@@ -166,14 +166,14 @@ export async function createInvestitie(
 
   if (error) throw error
 
-  return data
+  return data as unknown as Investitie
 }
 
 export async function updateInvestitie(
   id: string,
   input: UpdateInvestitieInput
 ): Promise<Investitie> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('investitii')
@@ -187,11 +187,11 @@ export async function updateInvestitie(
 
   if (error) throw error
 
-  return data
+  return data as unknown as Investitie
 }
 
 export async function deleteInvestitie(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { error } = await supabase
     .from('investitii')
@@ -200,3 +200,5 @@ export async function deleteInvestitie(id: string): Promise<void> {
 
   if (error) throw error
 }
+
+

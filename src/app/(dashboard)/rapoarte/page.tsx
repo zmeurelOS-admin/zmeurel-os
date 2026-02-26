@@ -8,7 +8,7 @@ export default async function RapoartePage() {
     await Promise.all([
       supabase
         .from('recoltari')
-        .select('id,id_recoltare,data,parcela_id,culegator_id,cantitate_kg')
+        .select('id,id_recoltare,data,parcela_id,culegator_id,kg_cal1,kg_cal2')
         .order('data', { ascending: false }),
       supabase
         .from('vanzari')

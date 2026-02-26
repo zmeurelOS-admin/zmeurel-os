@@ -1,5 +1,5 @@
 // src/lib/supabase/queries/cheltuieli.ts
-import { createClient } from '../client';
+import { getSupabase } from '../client';
 
 export interface Cheltuiala {
   id: string;
@@ -12,6 +12,7 @@ export interface Cheltuiala {
   furnizor: string | null;
   document_url: string | null;
   sync_status: string | null;
+  conflict_flag: boolean | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -38,8 +39,97 @@ export interface UpdateCheltuialaInput {
   document_url?: string;
 }
 
+type SupabaseLikeError = {
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+};
+
+const isMissingColumnError = (error: SupabaseLikeError, column: string) =>
+  error?.code === 'PGRST204' || error?.message?.includes(`'${column}'`);
+
+const isSchemaCacheMismatch = (error: unknown) => {
+  const e = (error ?? {}) as SupabaseLikeError;
+  const message = (e.message ?? '').toLowerCase();
+  return (
+    e?.code === 'PGRST204' ||
+    e?.code === '42703' ||
+    isMissingColumnError(e, 'client_sync_id') ||
+    message.includes('schema cache') ||
+    message.includes('could not find the') ||
+    message.includes('client_sync_id')
+  );
+};
+
+const shouldFallbackToLegacyInsert = (error: unknown) => {
+  const e = (error ?? {}) as SupabaseLikeError;
+  const message = (e.message ?? '').toLowerCase();
+  const code = e.code ?? '';
+
+  return (
+    code === 'PGRST204' ||
+    code === '42703' ||
+    code === '42P10' ||
+    isMissingColumnError(e, 'client_sync_id') ||
+    isMissingColumnError(e, 'sync_status') ||
+    isMissingColumnError(e, 'created_by') ||
+    isMissingColumnError(e, 'updated_by') ||
+    message.includes('schema cache') ||
+    message.includes('on conflict')
+  );
+};
+
+const shouldFallbackToLegacySelect = (error: unknown) => {
+  const e = (error ?? {}) as SupabaseLikeError;
+  const message = (e.message ?? '').toLowerCase();
+  const code = e.code ?? '';
+
+  return (
+    code === 'PGRST204' ||
+    code === '42703' ||
+    isMissingColumnError(e, 'client_sync_id') ||
+    isMissingColumnError(e, 'sync_status') ||
+    isMissingColumnError(e, 'created_by') ||
+    isMissingColumnError(e, 'updated_by') ||
+    message.includes('schema cache') ||
+    message.includes('could not find the')
+  );
+};
+
+const toReadableError = (error: unknown, fallbackMessage: string) => {
+  const e = (error ?? {}) as SupabaseLikeError;
+  const message = e?.message || e?.details || e?.hint || fallbackMessage;
+  return Object.assign(new Error(message), {
+    code: e?.code,
+    details: e?.details,
+    hint: e?.hint,
+    isSchemaCacheError: isSchemaCacheMismatch(error),
+  });
+};
+
+function normalizeCheltuialaRow(row: Record<string, unknown>): Cheltuiala {
+  return {
+    id: String(row.id ?? ''),
+    id_cheltuiala: String(row.id_cheltuiala ?? ''),
+    client_sync_id: String(row.client_sync_id ?? row.id ?? crypto.randomUUID()),
+    data: String(row.data ?? ''),
+    categorie: (row.categorie as string | null) ?? null,
+    descriere: (row.descriere as string | null) ?? null,
+    suma_lei: Number(row.suma_lei ?? 0),
+    furnizor: (row.furnizor as string | null) ?? null,
+    document_url: (row.document_url as string | null) ?? null,
+    sync_status: (row.sync_status as string | null) ?? null,
+    conflict_flag: (row.conflict_flag as boolean | null) ?? null,
+    created_by: (row.created_by as string | null) ?? null,
+    updated_by: (row.updated_by as string | null) ?? null,
+    created_at: String(row.created_at ?? ''),
+    updated_at: String(row.updated_at ?? ''),
+  };
+}
+
 async function generateNextId(): Promise<string> {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   const { data, error } = await supabase
     .from('cheltuieli_diverse')
@@ -69,25 +159,49 @@ async function generateNextId(): Promise<string> {
 }
 
 export async function getCheltuieli(): Promise<Cheltuiala[]> {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   const { data, error } = await supabase
     .from('cheltuieli_diverse')
-    .select('*')
+    .select('id,id_cheltuiala,client_sync_id,data,categorie,descriere,suma_lei,furnizor,document_url,sync_status,conflict_flag,created_by,updated_by,created_at,updated_at,tenant_id')
     .order('data', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching cheltuieli:', error);
-    throw error;
+  if (!error) {
+    return ((data ?? []) as unknown as Record<string, unknown>[]).map(normalizeCheltuialaRow);
   }
 
-  return data ?? [];
+  if (shouldFallbackToLegacySelect(error)) {
+    const { data: legacyData, error: legacyError } = await supabase
+      .from('cheltuieli_diverse')
+      .select('id,id_cheltuiala,data,categorie,descriere,suma_lei,furnizor,document_url,created_at,updated_at,tenant_id')
+      .order('data', { ascending: false });
+
+    if (legacyError) {
+      console.error('Error fetching cheltuieli (legacy fallback):', {
+        message: legacyError.message,
+        code: legacyError.code,
+        details: legacyError.details,
+        hint: legacyError.hint,
+      });
+      throw toReadableError(legacyError, 'Nu am putut incarca cheltuielile.');
+    }
+
+    return ((legacyData ?? []) as unknown as Record<string, unknown>[]).map(normalizeCheltuialaRow);
+  }
+
+  console.error('Error fetching cheltuieli:', {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+  });
+  throw toReadableError(error, 'Nu am putut incarca cheltuielile.');
 }
 
 export async function createCheltuiala(
   input: CreateCheltuialaInput
 ): Promise<Cheltuiala> {
-  const supabase = createClient();
+  const supabase = getSupabase();
   const nextId = await generateNextId();
   const {
     data: { user },
@@ -114,19 +228,54 @@ export async function createCheltuiala(
     .select()
     .single();
 
-  if (error) {
-    console.error('Error creating cheltuiala:', error);
-    throw error;
+  if (!error) {
+    return data as unknown as Cheltuiala;
   }
 
-  return data;
+  if (shouldFallbackToLegacyInsert(error)) {
+    const payloadLegacy = {
+      id_cheltuiala: nextId,
+      data: input.data,
+      categorie: input.categorie || null,
+      descriere: input.descriere || null,
+      suma_lei: input.suma_lei,
+      furnizor: input.furnizor || null,
+      document_url: input.document_url || null,
+    };
+
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('cheltuieli_diverse')
+      .insert(payloadLegacy)
+      .select()
+      .single();
+
+    if (fallbackError) {
+      console.error('Error creating cheltuiala (fallback):', {
+        message: fallbackError.message,
+        code: fallbackError.code,
+        details: fallbackError.details,
+        hint: fallbackError.hint,
+      });
+      throw toReadableError(fallbackError, 'Nu am putut salva cheltuiala.');
+    }
+
+    return fallbackData as unknown as Cheltuiala;
+  }
+
+  console.error('Error creating cheltuiala:', {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+  });
+  throw toReadableError(error, 'Nu am putut salva cheltuiala.');
 }
 
 export async function updateCheltuiala(
   id: string,
   input: UpdateCheltuialaInput
 ): Promise<Cheltuiala> {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   const { data, error } = await supabase
     .from('cheltuieli_diverse')
@@ -143,11 +292,11 @@ export async function updateCheltuiala(
     throw error;
   }
 
-  return data;
+  return data as unknown as Cheltuiala;
 }
 
 export async function deleteCheltuiala(id: string): Promise<void> {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   const { error } = await supabase
     .from('cheltuieli_diverse')
@@ -159,3 +308,5 @@ export async function deleteCheltuiala(id: string): Promise<void> {
     throw error;
   }
 }
+
+

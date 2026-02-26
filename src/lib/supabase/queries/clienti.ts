@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client"
+import { getSupabase } from "@/lib/supabase/client"
 import type { Tables } from "@/types/supabase"
 
 export type Client = Tables<"clienti">
@@ -21,7 +21,7 @@ export interface UpdateClientInput {
   observatii?: string | null
 }
 
-async function generateNextId(supabase: ReturnType<typeof createClient>): Promise<string> {
+async function generateNextId(supabase: ReturnType<typeof getSupabase>): Promise<string> {
   const { data, error } = await supabase
     .from("clienti")
     .select("id_client")
@@ -39,11 +39,11 @@ async function generateNextId(supabase: ReturnType<typeof createClient>): Promis
 }
 
 export async function getClienti(): Promise<Client[]> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from("clienti")
-    .select("*")
+    .select("id,id_client,nume_client,telefon,email,adresa,pret_negociat_lei_kg,observatii,google_resource_name,google_etag,created_at,updated_at,tenant_id")
     .order("created_at", { ascending: false })
 
   if (error) throw error
@@ -51,7 +51,7 @@ export async function getClienti(): Promise<Client[]> {
 }
 
 export async function createClienti(input: CreateClientInput): Promise<Client> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const id_client = await generateNextId(supabase)
 
@@ -77,7 +77,7 @@ export async function updateClienti(
   id: string,
   input: UpdateClientInput
 ): Promise<Client> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from("clienti")
@@ -94,7 +94,7 @@ export async function updateClienti(
 }
 
 export async function deleteClienti(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = getSupabase()
 
   const { error } = await supabase
     .from("clienti")
@@ -103,3 +103,4 @@ export async function deleteClienti(id: string): Promise<void> {
 
   if (error) throw error
 }
+

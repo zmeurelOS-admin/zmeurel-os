@@ -1,14 +1,16 @@
 'use client'
 
-import { AlertTriangle, Info, OctagonAlert } from 'lucide-react'
+import { AlertTriangle, Info, OctagonAlert, X } from 'lucide-react'
 
 import type { SmartAlert } from '@/lib/alerts/engine'
 
 interface AlertCardProps {
   alert: SmartAlert
+  onDismiss?: (alert: SmartAlert) => void
+  dismissing?: boolean
 }
 
-export function AlertCard({ alert }: AlertCardProps) {
+export function AlertCard({ alert, onDismiss, dismissing = false }: AlertCardProps) {
   const config = {
     info: {
       icon: Info,
@@ -35,10 +37,21 @@ export function AlertCard({ alert }: AlertCardProps) {
         <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${config.iconWrap}`}>
           <Icon className="h-4 w-4" />
         </span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h4 className="text-sm font-bold">{alert.title}</h4>
           <p className="mt-1 text-xs font-medium">{alert.message}</p>
         </div>
+        {onDismiss ? (
+          <button
+            type="button"
+            aria-label={`Ascunde alerta ${alert.title} pentru azi`}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-black/10 bg-white/60 text-[currentColor] transition hover:bg-white disabled:opacity-60"
+            onClick={() => onDismiss(alert)}
+            disabled={dismissing}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
     </article>
   )

@@ -10,8 +10,16 @@ import * as z from 'zod'
 
 import { AppDrawer } from '@/components/app/AppDrawer'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { trackEvent } from '@/lib/analytics/trackEvent'
 import { getCulegatori } from '@/lib/supabase/queries/culegatori'
@@ -22,12 +30,19 @@ const schema = z.object({
   data: z.string().min(1, 'Data este obligatorie'),
   parcela_id: z.string().min(1, 'Parcela este obligatorie'),
   culegator_id: z.string().min(1, 'Culegatorul este obligatoriu'),
-  cantitate_kg: z
+  kg_cal1: z
     .string()
     .trim()
-    .min(1, 'Cantitatea este obligatorie')
-    .refine((value) => Number.isFinite(Number(value)) && Number(value) > 0, {
-      message: 'Introduce cantitatea in kg',
+    .optional()
+    .refine((value) => value === undefined || value === '' || (Number.isFinite(Number(value)) && Number(value) >= 0), {
+      message: 'Kg Cal 1 trebuie sa fie >= 0',
+    }),
+  kg_cal2: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => value === undefined || value === '' || (Number.isFinite(Number(value)) && Number(value) >= 0), {
+      message: 'Kg Cal 2 trebuie sa fie >= 0',
     }),
   observatii: z.string().optional(),
 })
@@ -44,9 +59,16 @@ const defaultValues = (): FormData => ({
   data: new Date().toISOString().split('T')[0],
   parcela_id: '',
   culegator_id: '',
-  cantitate_kg: '',
+  kg_cal1: '',
+  kg_cal2: '',
   observatii: '',
 })
+
+function toNumber(value: string | undefined): number {
+  if (!value || value.trim() === '') return 0
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+}
 
 export function AddRecoltareDialog({ open, onOpenChange, hideTrigger = false }: AddRecoltareDialogProps) {
   const queryClient = useQueryClient()
@@ -84,29 +106,44 @@ export function AddRecoltareDialog({ open, onOpenChange, hideTrigger = false }: 
     mutationFn: createRecoltare,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recoltari'] })
-      trackEvent('create_recoltare', { source: 'AddRecoltareDialog' })
+      trackEvent('create_recoltare', 'recoltari', { source: 'AddRecoltareDialog' })
       toast.success('Recoltare adaugata')
       setDialogOpen(false)
     },
-    onError: (error: any) => {
-      const conflict = error?.status === 409 || error?.code === '23505'
+    onError: (error: unknown) => {
+      const maybeError = error as { status?: number; code?: string; message?: string }
+      const conflict = maybeError?.status === 409 || maybeError?.code === '23505'
       if (conflict) {
         toast.info('Inregistrarea era deja sincronizata.')
         setDialogOpen(false)
         return
       }
-      toast.error('Eroare la salvare')
+      toast.error(maybeError?.message || 'Eroare la salvare')
     },
   })
 
+  const selectedCulegatorId = form.watch('culegator_id')
+  const kgCal1 = toNumber(form.watch('kg_cal1'))
+  const kgCal2 = toNumber(form.watch('kg_cal2'))
+  const totalKg = kgCal1 + kgCal2
+  const selectedCulegator = culegatori.find((culegator) => culegator.id === selectedCulegatorId)
+  const tarifLeiKg = Number(selectedCulegator?.tarif_lei_kg ?? 0)
+  const hasValidTarif = Number.isFinite(tarifLeiKg) && tarifLeiKg > 0
+  const valoareMunca = hasValidTarif ? totalKg * tarifLeiKg : null
+
   const onSubmit = (data: FormData) => {
     if (mutation.isPending) return
+    if (!hasValidTarif) {
+      toast.error('Culegatorul nu are tarif setat in profil')
+      return
+    }
 
     mutation.mutate({
       data: data.data,
       parcela_id: data.parcela_id,
       culegator_id: data.culegator_id,
-      cantitate_kg: Number(data.cantitate_kg),
+      kg_cal1: toNumber(data.kg_cal1),
+      kg_cal2: toNumber(data.kg_cal2),
       observatii: data.observatii?.trim() || undefined,
     })
   }
@@ -150,18 +187,22 @@ export function AddRecoltareDialog({ open, onOpenChange, hideTrigger = false }: 
 
           <div className="space-y-2">
             <Label htmlFor="recoltare_parcela">Parcela</Label>
-            <select
-              id="recoltare_parcela"
-              className="agri-control h-12 w-full px-3 text-base"
-              {...form.register('parcela_id')}
+            <Select
+              value={form.watch('parcela_id') || '__none'}
+              onValueChange={(value) => form.setValue('parcela_id', value === '__none' ? '' : value, { shouldDirty: true, shouldValidate: true })}
             >
-              <option value="">Selecteaza parcela</option>
-              {parcele.map((parcela) => (
-                <option key={parcela.id} value={parcela.id}>
-                  {parcela.nume_parcela || 'Parcela'}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="recoltare_parcela" className="agri-control h-12">
+                <SelectValue placeholder="Selecteaza parcela" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Selecteaza parcela</SelectItem>
+                {parcele.map((parcela) => (
+                  <SelectItem key={parcela.id} value={parcela.id}>
+                    {parcela.nume_parcela || 'Parcela'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {form.formState.errors.parcela_id ? (
               <p className="text-xs text-red-600">{form.formState.errors.parcela_id.message}</p>
             ) : null}
@@ -169,39 +210,92 @@ export function AddRecoltareDialog({ open, onOpenChange, hideTrigger = false }: 
 
           <div className="space-y-2">
             <Label htmlFor="recoltare_culegator">Culegator</Label>
-            <select
-              id="recoltare_culegator"
-              className="agri-control h-12 w-full px-3 text-base"
-              {...form.register('culegator_id')}
+            <Select
+              value={form.watch('culegator_id') || '__none'}
+              onValueChange={(value) => form.setValue('culegator_id', value === '__none' ? '' : value, { shouldDirty: true, shouldValidate: true })}
             >
-              <option value="">Selecteaza culegator</option>
-              {culegatori.map((culegator) => (
-                <option key={culegator.id} value={culegator.id}>
-                  {culegator.nume_prenume || 'Culegator'}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="recoltare_culegator" className="agri-control h-12">
+                <SelectValue placeholder="Selecteaza culegator" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Selecteaza culegator</SelectItem>
+                {culegatori.map((culegator) => (
+                  <SelectItem key={culegator.id} value={culegator.id}>
+                    {culegator.nume_prenume || 'Culegator'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {form.formState.errors.culegator_id ? (
               <p className="text-xs text-red-600">{form.formState.errors.culegator_id.message}</p>
             ) : null}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="recoltare_cantitate">Cantitate (kg)</Label>
-            <Input
-              id="recoltare_cantitate"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0.01"
-              placeholder="0.00"
-              className="agri-control h-12"
-              {...form.register('cantitate_kg')}
-            />
-            {form.formState.errors.cantitate_kg ? (
-              <p className="text-xs text-red-600">{form.formState.errors.cantitate_kg.message}</p>
-            ) : null}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="recoltare_kg_cal1">Kg Calitatea 1</Label>
+              <Input
+                id="recoltare_kg_cal1"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                className="agri-control h-12"
+                {...form.register('kg_cal1')}
+              />
+              {form.formState.errors.kg_cal1 ? (
+                <p className="text-xs text-red-600">{form.formState.errors.kg_cal1.message}</p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="recoltare_kg_cal2">Kg Calitatea 2</Label>
+              <Input
+                id="recoltare_kg_cal2"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                className="agri-control h-12"
+                {...form.register('kg_cal2')}
+              />
+              {form.formState.errors.kg_cal2 ? (
+                <p className="text-xs text-red-600">{form.formState.errors.kg_cal2.message}</p>
+              ) : null}
+            </div>
           </div>
+
+          <Card className="rounded-2xl border border-emerald-100 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Rezumat plata</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 text-sm">
+              <p>Total kg: <span className="font-semibold">{totalKg.toFixed(2)} kg</span></p>
+              {selectedCulegator ? (
+                <>
+                  <p>
+                    Tarif:{' '}
+                    <span className="font-semibold">
+                      {hasValidTarif ? `${tarifLeiKg.toFixed(2)} lei/kg` : '—'}
+                    </span>{' '}
+                    <span className="text-xs text-[var(--agri-text-muted)]">(din profil culegator)</span>
+                  </p>
+                  <p>
+                    De plata:{' '}
+                    <span className="font-semibold">
+                      {valoareMunca !== null ? `${valoareMunca.toFixed(2)} lei` : '—'}
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[var(--agri-text-muted)]">Selecteaza culegatorul ca sa calculez plata</p>
+                  <p>De plata: <span className="font-semibold">—</span></p>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
           <div className="space-y-2">
             <Label htmlFor="recoltare_observatii">Observatii</Label>

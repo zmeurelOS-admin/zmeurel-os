@@ -24,14 +24,14 @@ export function ConfirmDeleteDialog({
   onConfirm,
   itemName,
   itemType = 'Element',
-  title = 'Confirmi stergerea?',
+  title = 'Confirmi ștergerea?',
   description,
-  confirmText = 'Sterge',
-  cancelText = 'Anuleaza',
+  confirmText = 'Șterge',
+  cancelText = 'Anulează',
   loading = false,
 }: ConfirmDeleteDialogProps) {
   const label = itemName ? `${itemType} ${itemName}` : itemType
-  const bodyText = description ?? `${label} va fi sters definitiv.`
+  const bodyText = description ?? `${label} va fi șters definitiv.`
 
   return (
     <AppDialog
@@ -39,7 +39,7 @@ export function ConfirmDeleteDialog({
       onOpenChange={onOpenChange}
       title={title}
       footer={
-        <div className="grid grid-cols-2 gap-3">
+        <>
           <Button type="button" variant="outline" className="agri-cta" onClick={() => onOpenChange(false)} disabled={loading}>
             {cancelText}
           </Button>
@@ -49,9 +49,9 @@ export function ConfirmDeleteDialog({
             onClick={onConfirm}
             disabled={loading}
           >
-            {loading ? 'Se sterge...' : confirmText}
+            {loading ? 'Se șterge...' : confirmText}
           </Button>
-        </div>
+        </>
       }
     >
       <div className="flex items-start gap-3">

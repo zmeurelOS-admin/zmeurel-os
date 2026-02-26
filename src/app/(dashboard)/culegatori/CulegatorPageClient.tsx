@@ -5,8 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Users } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { AppDialog } from '@/components/app/AppDialog'
 import { AppShell } from '@/components/app/AppShell'
+import { ConfirmDeleteDialog } from '@/components/app/ConfirmDeleteDialog'
 import { EmptyState } from '@/components/app/EmptyState'
 import { ErrorState } from '@/components/app/ErrorState'
 import { Fab } from '@/components/app/Fab'
@@ -16,7 +16,6 @@ import { StickyActionBar } from '@/components/app/StickyActionBar'
 import { AddCulegatorDialog } from '@/components/culegatori/AddCulegatorDialog'
 import { CulegatorCard } from '@/components/culegatori/CulegatorCard'
 import { EditCulegatorDialog } from '@/components/culegatori/EditCulegatorDialog'
-import { Button } from '@/components/ui/button'
 import {
   createCulegator,
   deleteCulegator,
@@ -159,34 +158,19 @@ export function CulegatorPageClient({ initialCulegatori }: Props) {
         />
       ) : null}
 
-      <AppDialog
+      <ConfirmDeleteDialog
         open={!!deleting}
         onOpenChange={(open) => {
           if (!open) setDeleting(null)
         }}
-        title="Confirma stergerea"
-        footer={
-          <div className="grid grid-cols-2 gap-3">
-            <Button type="button" variant="outline" className="agri-cta" onClick={() => setDeleting(null)}>
-              Anuleaza
-            </Button>
-            <Button
-              type="button"
-              className="agri-cta bg-[var(--agri-danger)] text-white"
-              onClick={() => {
-                if (deleting) deleteMutation.mutate(deleting.id)
-              }}
-              disabled={deleteMutation.isPending}
-            >
-              Sterge
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-[var(--agri-text-muted)]">
-          Confirmi stergerea culegatorului <strong>{deleting?.nume_prenume ?? ''}</strong>?
-        </p>
-      </AppDialog>
+        itemType="Culegator"
+        itemName={deleting?.nume_prenume || 'Culegator selectat'}
+        description="Culegatorul selectat va fi sters definitiv."
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleting) deleteMutation.mutate(deleting.id)
+        }}
+      />
     </AppShell>
   )
 }

@@ -23,7 +23,7 @@ export default function ActivitatiPage() {
         width: '100%',
         minHeight: '100%',
         paddingBottom: 20,
-        overflow: 'hidden',
+        overflowX: 'hidden',
         fontFamily: 'inherit',
       }}
     >

@@ -1,11 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import * as Sentry from '@sentry/nextjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { AppDialog } from '@/components/app/AppDialog'
 import { AppShell } from '@/components/app/AppShell'
+import { ConfirmDeleteDialog } from '@/components/app/ConfirmDeleteDialog'
 import { EmptyState } from '@/components/app/EmptyState'
 import { ErrorState } from '@/components/app/ErrorState'
 import { Fab } from '@/components/app/Fab'
@@ -15,8 +16,9 @@ import { StickyActionBar } from '@/components/app/StickyActionBar'
 import { AddCheltuialaDialog } from '@/components/cheltuieli/AddCheltuialaDialog'
 import { CheltuialaCard } from '@/components/cheltuieli/CheltuialaCard'
 import { EditCheltuialaDialog } from '@/components/cheltuieli/EditCheltuialaDialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { trackEvent } from '@/lib/analytics/trackEvent'
+import { buildCheltuialaDeleteLabel } from '@/lib/ui/delete-labels'
 import {
   createCheltuiala,
   deleteCheltuiala,
@@ -36,6 +38,34 @@ interface CheltuialaFormData {
 
 interface CheltuialaPageClientProps {
   initialCheltuieli: Cheltuiala[]
+}
+
+function isSchemaCacheError(error: unknown): boolean {
+  const message = String((error as { message?: string })?.message ?? '').toLowerCase()
+  return message.includes('schema cache') || message.includes('could not find the')
+}
+
+function handleCheltuialaError(error: unknown, fallbackMessage: string) {
+  const message = String((error as { message?: string })?.message ?? fallbackMessage)
+  const schemaIssue = isSchemaCacheError(error)
+
+  Sentry.captureException(error, {
+    tags: {
+      module: 'cheltuieli',
+      table: 'cheltuieli_diverse',
+    },
+    extra: {
+      originalMessage: message,
+      schemaIssue,
+    },
+  })
+
+  if (schemaIssue) {
+    toast.error('Schema DB nu e sincronizata. Reincarca aplicatia sau ruleaza reload schema in Supabase.')
+    return
+  }
+
+  toast.error(message || fallbackMessage)
 }
 
 export function CheltuialaPageClient({ initialCheltuieli }: CheltuialaPageClientProps) {
@@ -79,7 +109,7 @@ export function CheltuialaPageClient({ initialCheltuieli }: CheltuialaPageClient
         toast.info('Inregistrarea era deja sincronizata.')
         return
       }
-      toast.error(err.message)
+      handleCheltuialaError(err, 'Nu am putut salva cheltuiala.')
     },
   })
 
@@ -97,7 +127,7 @@ export function CheltuialaPageClient({ initialCheltuieli }: CheltuialaPageClient
       toast.success('Cheltuiala actualizata')
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      handleCheltuialaError(err, 'Nu am putut actualiza cheltuiala.')
     },
   })
 
@@ -105,11 +135,12 @@ export function CheltuialaPageClient({ initialCheltuieli }: CheltuialaPageClient
     mutationFn: deleteCheltuiala,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cheltuieli'] })
+      trackEvent('delete_item', 'cheltuieli')
       toast.success('Cheltuiala stearsa')
       setDeleting(null)
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      handleCheltuialaError(err, 'Nu am putut sterge cheltuiala.')
     },
   })
 
@@ -195,34 +226,19 @@ export function CheltuialaPageClient({ initialCheltuieli }: CheltuialaPageClient
         }}
       />
 
-      <AppDialog
+      <ConfirmDeleteDialog
         open={!!deleting}
         onOpenChange={(open) => {
           if (!open) setDeleting(null)
         }}
-        title="Confirma stergerea"
-        footer={
-          <div className="grid grid-cols-2 gap-3">
-            <Button type="button" variant="outline" className="agri-cta" onClick={() => setDeleting(null)}>
-              Anuleaza
-            </Button>
-            <Button
-              type="button"
-              className="agri-cta bg-[var(--agri-danger)] text-white"
-              onClick={() => {
-                if (deleting) deleteMutation.mutate(deleting.id)
-              }}
-              disabled={deleteMutation.isPending}
-            >
-              Sterge
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-[var(--agri-text-muted)]">
-          Confirmi stergerea cheltuielii <strong>{deleting?.id_cheltuiala ?? ''}</strong>?
-        </p>
-      </AppDialog>
+        itemType="Cheltuiala"
+        itemName={buildCheltuialaDeleteLabel(deleting)}
+        description="Cheltuiala selectata va fi stearsa definitiv."
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleting) deleteMutation.mutate(deleting.id)
+        }}
+      />
     </AppShell>
   )
 }

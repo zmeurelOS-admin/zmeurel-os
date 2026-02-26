@@ -14,7 +14,7 @@ interface DensityContextValue {
 }
 
 const STORAGE_KEY = 'ui_preferences'
-const DEFAULT_PREFERENCES: UiPreferences = { density: 'compact' }
+const DEFAULT_PREFERENCES: UiPreferences = { density: 'normal' }
 
 const DensityContext = createContext<DensityContextValue | null>(null)
 
@@ -42,8 +42,7 @@ export function DensityProvider({ children }: { children: React.ReactNode }) {
   const [density, setDensityState] = useState<DensityMode>(DEFAULT_PREFERENCES.density)
 
   useEffect(() => {
-    const preferences = readPreferences()
-    setDensityState(preferences.density)
+    setDensityState(readPreferences().density)
   }, [])
 
   useEffect(() => {

@@ -4,6 +4,7 @@ export type AlertSeverity = 'info' | 'warning' | 'danger'
 
 export interface SmartAlert {
   id: string
+  alertKey: string
   severity: AlertSeverity
   title: string
   message: string
@@ -71,6 +72,7 @@ export function generateSmartAlerts(input: SmartAlertInput): SmartAlert[] {
   if (cost30 > venit30 && (cost30 > 0 || venit30 > 0)) {
     alerts.push({
       id: 'cost-over-income',
+      alertKey: 'cost_over_income:30d',
       severity: 'danger',
       title: 'Costuri peste venit',
       message: `Ultimele 30 zile: costuri ${cost30.toFixed(0)} lei, venit ${venit30.toFixed(0)} lei.`,
@@ -80,6 +82,7 @@ export function generateSmartAlerts(input: SmartAlertInput): SmartAlert[] {
   if (metrics30.margin < 0 && metrics30.revenue > 0) {
     alerts.push({
       id: 'negative-margin',
+      alertKey: 'negative_margin:30d',
       severity: 'danger',
       title: 'Marja negativa',
       message: `Marja curenta este ${metrics30.margin.toFixed(1)}%.`,
@@ -99,6 +102,7 @@ export function generateSmartAlerts(input: SmartAlertInput): SmartAlert[] {
     if (!latest) {
       alerts.push({
         id: `no-harvest-${parcela.id}`,
+        alertKey: `no_harvest:${parcela.id}`,
         severity: 'warning',
         title: 'Parcela fara recoltare',
         message: `${parcela.nume_parcela ?? 'Parcela'} nu are recoltari inregistrate.`,
@@ -110,6 +114,7 @@ export function generateSmartAlerts(input: SmartAlertInput): SmartAlert[] {
     if (diffDays >= NO_HARVEST_DAYS_THRESHOLD) {
       alerts.push({
         id: `stale-harvest-${parcela.id}`,
+        alertKey: `stale_harvest:${parcela.id}`,
         severity: 'warning',
         title: 'Parcela fara recoltare recenta',
         message: `${parcela.nume_parcela ?? 'Parcela'} nu a avut recoltare de ${diffDays} zile.`,
@@ -124,6 +129,7 @@ export function generateSmartAlerts(input: SmartAlertInput): SmartAlert[] {
     if (diffDays > 2 && !activity.operator) {
       alerts.push({
         id: `late-activity-${activity.id}`,
+        alertKey: `late_activity:${activity.id}`,
         severity: 'warning',
         title: 'Activitate posibil intarziata',
         message: `${activity.tip_activitate ?? 'Activitate'} are data ${applyDate.toLocaleDateString('ro-RO')} si nu are operator.`,
@@ -137,6 +143,7 @@ export function generateSmartAlerts(input: SmartAlertInput): SmartAlert[] {
         const remaining = Math.ceil((pauseEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
         alerts.push({
           id: `pause-active-${activity.id}`,
+          alertKey: `pauza_activa:${activity.id}`,
           severity: 'info',
           title: 'Timp pauza tratament activ',
           message: `${activity.tip_activitate ?? 'Tratament'} are inca ${remaining} zile pana la expirare.`,

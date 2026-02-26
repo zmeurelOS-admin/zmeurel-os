@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { getSupabase } from '@/lib/supabase/client'
 import {
   enqueue,
   getFailed,
@@ -76,7 +76,7 @@ function hasConflictFlag(data: unknown): boolean {
 
 export class SyncEngine {
   private readonly config: Required<SyncEngineConfig>
-  private readonly supabase = createClient()
+  private readonly supabase = getSupabase()
   private intervalId: number | null = null
   private started = false
   private syncing = false
@@ -148,7 +148,7 @@ export class SyncEngine {
     await markSyncing(item.id)
 
     try {
-      const { data, error } = await this.supabase.rpc('upsert_with_idempotency', {
+      const { data, error } = await (this.supabase as any).rpc('upsert_with_idempotency', {
         table_name: item.table,
         payload: item.payload,
       })
@@ -241,3 +241,5 @@ export function getSyncEngine(config?: SyncEngineConfig): SyncEngine {
 
   return syncEngineInstance
 }
+
+

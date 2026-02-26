@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Tractor } from 'lucide-react'
 
-import { createClient } from '@/lib/supabase/client'
+import { getSupabase } from '@/lib/supabase/client'
 
 interface FarmSwitcherProps {
   variant?: 'chip' | 'panel'
@@ -11,10 +11,10 @@ interface FarmSwitcherProps {
 }
 
 function useCurrentFarmLabel() {
-  const [farmName, setFarmName] = useState('Ferma curenta')
+  const [farmName, setFarmName] = useState('Ferma curentă')
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = getSupabase()
     let mounted = true
 
     const loadFarm = async () => {
@@ -47,7 +47,7 @@ function useCurrentFarmLabel() {
 export function FarmSwitcher({ variant = 'panel', onActivate }: FarmSwitcherProps) {
   const farmName = useCurrentFarmLabel()
 
-  const label = useMemo(() => farmName || 'Ferma curenta', [farmName])
+  const label = useMemo(() => farmName || 'Ferma curentă', [farmName])
 
   if (variant === 'chip') {
     return (
@@ -55,7 +55,7 @@ export function FarmSwitcher({ variant = 'panel', onActivate }: FarmSwitcherProp
         type="button"
         onClick={onActivate}
         className="agri-control inline-flex h-9 max-w-[190px] items-center gap-2 rounded-full border border-[var(--agri-border)] bg-white px-3 text-xs font-semibold text-[var(--agri-text)]"
-        aria-label="Schimba ferma"
+        aria-label="Schimbă fermă"
       >
         <Tractor className="h-3.5 w-3.5 text-emerald-700" />
         <span className="truncate">{label}</span>
@@ -66,12 +66,14 @@ export function FarmSwitcher({ variant = 'panel', onActivate }: FarmSwitcherProp
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-[var(--agri-text-muted)]">Ferma activa</p>
+      <p className="text-sm text-[var(--agri-text-muted)]">Ferma activă</p>
       <div className="agri-control flex h-12 items-center justify-between rounded-xl border px-3">
         <span className="truncate text-sm font-semibold text-[var(--agri-text)]">{label}</span>
         <ChevronDown className="h-4 w-4 text-[var(--agri-text-muted)]" />
       </div>
-      <p className="text-xs text-[var(--agri-text-muted)]">Selectia fermei foloseste fluxul existent de tenant.</p>
+      <p className="text-xs text-[var(--agri-text-muted)]">Selecția fermei folosește fluxul existent de tenant.</p>
     </div>
   )
 }
+
+
